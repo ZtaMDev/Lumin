@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use luminjs::diagnostic::DiagnosticSeverity;
+use luminjs::error::CompileError;
 use owo_colors::OwoColorize;
 
 /// LuminJS compiler CLI
@@ -31,9 +32,9 @@ enum Commands {
         #[arg(long)]
         no_emit: bool,
 
-        /// Emit a single bundle.js instead of a module per file
-        #[arg(long, default_value_t = true)]
-        bundle: bool,
+        /// Do not emit a single bundle.js; output a module per file
+        #[arg(long)]
+        no_bundle: bool,
     },
 }
 
@@ -52,10 +53,53 @@ fn main() {
             out,
             format,
             no_emit,
-            bundle,
+            no_bundle,
         } => {
-            if let Err(err) = run_build(input, out, format, no_emit, bundle) {
-                eprintln!("error: {:#}", err);
+            let bundle = !no_bundle;
+            if let Err(err) = run_build(input.clone(), out, format.clone(), no_emit, bundle) {
+                // If the error is just "build failed", diagnostics have already been printed by run_build.
+                // We don't want to print a second JSON object or error message.
+                if err.to_string() == "build failed" {
+                    std::process::exit(1);
+                }
+
+                match format {
+                    OutputFormat::Json => {
+                        let mut payload = serde_json::json!({
+                            "file": input.display().to_string(),
+                            "error": err.to_string(),
+                        });
+
+                        if let Some(ce) = err.downcast_ref::<CompileError>() {
+                             let range = match ce {
+                                CompileError::Syntax { range, .. } => range,
+                                CompileError::InvalidStructure { range, .. } => range,
+                                CompileError::Template { range, .. } => range,
+                             };
+                             
+                             if let Some(r) = range {
+                                 if let Ok(source) = std::fs::read_to_string(&input) {
+                                     let starts = luminjs::diagnostic::compute_line_starts(&source);
+                                     let (start_lc, end_lc) = luminjs::diagnostic::range_to_line_cols(&starts, r.start, r.end);
+                                     
+                                     payload = serde_json::json!({
+                                        "file": input.display().to_string(),
+                                        "error": err.to_string(),
+                                        "line": start_lc.line,
+                                        "column": start_lc.col,
+                                        "endLine": end_lc.line,
+                                        "endColumn": end_lc.col
+                                     });
+                                 }
+                             }
+                        }
+
+                        println!("{}", serde_json::to_string_pretty(&payload).unwrap());
+                    }
+                    OutputFormat::Pretty => {
+                        eprintln!("error: {:#}", err);
+                    }
+                }
                 std::process::exit(1);
             }
         }
@@ -155,9 +199,9 @@ fn run_build(
   <body>
     <div id="app"></div>
 
-    <script src="./{0}"></script>
-    <script>
-      window.Lumin.hydrate(document.getElementById('app'));
+    <script type="module">
+      import {{ hydrate }} from './{0}';
+      hydrate(document.getElementById('app'));
     </script>
   </body>
 </html>
@@ -177,9 +221,7 @@ fn run_build(
 
     <script type="module">
       import {{ hydrate }} from './{0}';
-
-      const root = document.getElementById('app');
-      hydrate(root);
+      hydrate(document.getElementById('app'));
     </script>
   </body>
 </html>

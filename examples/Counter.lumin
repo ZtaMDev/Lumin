@@ -12,6 +12,6 @@ function dec() {
 <div>
   <h1>Count: {count()}</h1>
   <button onClick={inc}>Increment</button>
-  <button onClick={() => { count(count() - 1) } }>Decrement</button>
-  <button onClick={() => { console.log("Logging to console") } }>Log</button>
+  <button onClick={() => { count(count() - 1) }}>Decrement</button>
+  <button onClick={() => { console.log("Logging to console") }}>Log</button>
 </div>

@@ -19,7 +19,13 @@ use crate::diagnostic::{range_to_line_cols, DiagnosticSeverity, SourceRange};
 /// Compile a `.lumin` file from `input_path` and return the generated JS code.
 pub fn compile_file<P: AsRef<Path>>(input_path: P) -> Result<String> {
     let source: String = std::fs::read_to_string(&input_path)?;
-    let (js, diags) = compile_source_with_diagnostics(&source)
+    let component_name = input_path
+        .as_ref()
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Component");
+        
+    let (js, diags) = compile_source_with_diagnostics(&source, component_name)
         .map_err(|e| anyhow::Error::new(e))?;
 
     if !diags.is_empty() {
@@ -35,11 +41,18 @@ pub fn compile_file_with_diagnostics<P: AsRef<Path>>(
     input_path: P,
 ) -> Result<(String, Vec<Diagnostic>)> {
     let source: String = std::fs::read_to_string(&input_path)?;
-    compile_source_with_diagnostics(&source).map_err(|e| anyhow::Error::new(e))
+    let component_name = input_path
+        .as_ref()
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Component");
+
+    compile_source_with_diagnostics(&source, component_name).map_err(|e| anyhow::Error::new(e))
 }
 
 fn compile_source_with_diagnostics(
     source: &str,
+    component_name: &str,
 ) -> std::result::Result<(String, Vec<Diagnostic>), error::CompileError> {
     let line_starts = compute_line_starts(source);
 
@@ -74,7 +87,7 @@ fn compile_source_with_diagnostics(
     // Semantic validation: component tags must be imported
     diags.extend(validate_component_tags_imported(source, &line_starts, &component));
 
-    let js: String = codegen::generate_js(&component);
+    let js: String = codegen::generate_js(&component, component_name);
     Ok((js, diags))
 }
 

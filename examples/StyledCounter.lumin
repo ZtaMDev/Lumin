@@ -1,0 +1,46 @@
+---
+import { Counter } from "./Counter.lumin";
+---
+
+<script>
+  import { signal } from "@luminjs/runtime";
+  const count = signal(0);
+  const inc = () => count(count() + 1);
+  const dec = () => count(count() - 1);
+  
+  const title = "Styled Counter";
+  const color = signal("blue");
+</script>
+
+<style>
+  .counter {
+    border: 2px solid #ccc;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    font-family: sans-serif;
+  }
+  .display {
+    font-size: 2rem;
+    margin: 10px 0;
+  }
+  button {
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    margin: 0 5px;
+  }
+</style>
+
+
+<div class="counter">
+  <h1>{title}</h1>
+  <div class="display" style={'color: ' + color()}>
+    Count: {count()}
+  </div>
+  <button onClick={inc}>Increment</button>
+  <button onClick={dec}>Decrement</button>
+  <button onClick={() => color(color() === 'blue' ? 'red' : 'blue')}>
+    Toggle Color
+  </button>
+</div>

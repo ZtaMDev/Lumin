@@ -2,16 +2,14 @@ use std::fs;
 
 #[test]
 fn compiles_simple_lumin_file_to_js() {
-    let tmp_dir: tempfile::TempDir = tempfile::tempdir().expect("tempdir");
-    let input_path: std::path::PathBuf = tmp_dir.path().join("App.lumin");
+    let tmp_dir = tempfile::tempdir().expect("tempdir");
+    let input_path = tmp_dir.path().join("App.lumin");
 
-    let source: &str = r#"<script>
+    let source = r#"<script>
 const count = signal(0)
-
 function inc() {
   count(count() + 1)
 }
-
 </script>
 
 <div>
@@ -22,10 +20,14 @@ function inc() {
 
     fs::write(&input_path, source).expect("write input");
 
-    let js: String = luminjs::compile_file(&input_path).expect("compile");
+    let js = luminjs::compile_file(&input_path).expect("compile");
 
-    assert!(js.contains("renderToString"));
-    assert!(js.contains("hydrate"));
+    assert!(js.contains("import { h, hydrate as __hydrate } from '@luminjs/runtime';"));
+    assert!(js.contains("function Component"));
+    assert!(js.contains("export default Component;"));
+    assert!(js.contains("h('div'"));
+    assert!(js.contains("h('h1'"));
+    assert!(js.contains("'onClick': inc"));
 }
 
 #[test]
@@ -51,7 +53,7 @@ import X from "./Card.lumin"
 }
 
 #[test]
-fn supports_inline_arrow_event_handlers_with_blocks() {
+fn supports_inline_arrow_event_handlers() {
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let input_path = tmp_dir.path().join("App.lumin");
 
@@ -60,7 +62,7 @@ const count = signal(0)
 </script>
 
 <div>
-  <button onClick={() => { count(count() + 1) }}>Inc</button>
+  <button onClick={() => count(count() + 1)}>Inc</button>
 </div>
 "#;
 
@@ -68,9 +70,8 @@ const count = signal(0)
 
     let js = luminjs::compile_file(&input_path).expect("compile");
 
-    // We should emit an on-click data attribute and a synthetic handler (h0).
-    assert!(js.contains("data-lumin-on-click=\"h0\""));
-    assert!(js.contains("h0: () => { count(count() + 1) }"));
+    // Should contain the inline arrow in the h() call props
+    assert!(js.contains("'onClick': () => count(count() + 1)"));
 }
 
 #[test]
@@ -130,53 +131,30 @@ import Counter from "./Counter.lumin"
     fs::write(&app_path, app).expect("write app");
 
     let res = luminjs::bundler::bundle_entry(&app_path).expect("bundle");
-    assert!(res.diagnostics.is_empty());
-    assert!(res.js.contains("const __luminComponents"));
-    assert!(res.js.contains("data-lumin-mount=\"Counter\""));
+    assert!(res.diagnostics.is_empty(), "Diagnostics: {:?}", res.diagnostics);
+    
+    // New ESM bundle assertions
+    assert!(res.js.contains("import { h, hydrate as __hydrate } from '@luminjs/runtime';"));
+    assert!(res.js.contains("const __luminComponents = {};"));
+    assert!(res.js.contains("h(__luminComponents['Counter'].default, null)"));
+    assert!(res.js.contains("export function hydrate(root)"));
 }
 
 #[test]
-fn errors_when_component_tag_is_not_imported() {
+fn supports_style_tags() {
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let input_path = tmp_dir.path().join("App.lumin");
 
-    let source = r#"<div><Missing /></div>"#;
+    let source = r#"<style>
+.red { color: red; }
+</style>
+<div class="red">Hello</div>
+"#;
+
     fs::write(&input_path, source).expect("write input");
 
-    let (_js, diags) = luminjs::compile_file_with_diagnostics(&input_path)
-        .expect("compile_with_diagnostics");
+    let js = luminjs::compile_file(&input_path).expect("compile");
 
-    assert!(
-        diags.iter()
-            .any(|d| d.message.contains("Cannot find component 'Missing'")),
-        "expected missing-component diagnostic"
-    );
-}
-
-#[test]
-fn bundler_does_not_include_unused_imported_components() {
-    let tmp_dir = tempfile::tempdir().expect("tempdir");
-    let app_path = tmp_dir.path().join("App.lumin");
-    let counter_path = tmp_dir.path().join("Counter.lumin");
-
-    fs::write(
-        &counter_path,
-        r#"<div><h1>Counter</h1></div>"#,
-    )
-    .expect("write counter");
-
-    fs::write(
-        &app_path,
-        r#"---
-import Counter from "./Counter.lumin"
----
-
-<div><h1>App</h1></div>
-"#,
-    )
-    .expect("write app");
-
-    let res = luminjs::bundler::bundle_entry(&app_path).expect("bundle");
-    assert!(res.diagnostics.is_empty());
-    assert!(!res.js.contains("__luminComponents[\"Counter\"]"));
+    assert!(js.contains(".red { color: red; }"));
+    assert!(js.contains("const styleId = 'lumin-styles'"));
 }

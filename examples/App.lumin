@@ -1,8 +1,7 @@
 ---
-import Counter from "./Counter.lumin"
+import { StyledCounter } from "./StyledCounter.lumin"
 ---
 
 <div>
-  <Counter />
-  <Counter />
+  <StyledCounter />
 </div>

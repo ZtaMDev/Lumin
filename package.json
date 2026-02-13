@@ -1,17 +1,27 @@
 {
-  "name": "@luminjs/monorepo",
-  "version": "0.1.0",
+  "name": "luminjs-monorepo",
   "private": true,
-  "description": "LuminJS monorepo - compiler, runtime, and Vite plugin",
+  "description": "LuminJS: A high-performance reactive framework with a Rust compiler",
+  "workspaces": [
+    "packages/*",
+    "examples"
+  ],
   "scripts": {
-    "build": "pnpm -r build",
-    "dev": "pnpm -r dev",
-    "test": "cargo test && pnpm -r test"
+    "build": "bun run --filter '*' build",
+    "test": "bun test",
+    "compiler:build": "cd packages/compiler && cargo build"
   },
+  "keywords": [
+    "luminjs",
+    "framework",
+    "signals",
+    "rust",
+    "compiler"
+  ],
+  "author": "LuminJS Team",
+  "license": "MIT",
   "devDependencies": {
-    "pnpm": "^8.0.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
   }
 }

@@ -1,0 +1,27 @@
+{
+  "name": "@luminjs/runtime",
+  "version": "0.1.0",
+  "description": "The modular runtime for LuminJS",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "luminjs",
+    "runtime",
+    "signals",
+    "framework"
+  ],
+  "author": "LuminJS Team",
+  "license": "MIT",
+  "devDependencies": {
+    "happy-dom": "^20.6.1",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@types/bun": "^1.3.9"
+  }
+}

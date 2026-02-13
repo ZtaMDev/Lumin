@@ -2,7 +2,14 @@
 pub struct ComponentFile {
     pub imports: Vec<ComponentImport>,
     pub script: Option<ScriptBlock>,
+    pub style: Option<StyleBlock>,
     pub template: Vec<TemplateNode>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StyleBlock {
+    pub code: String,
+    pub span: Option<SourceRange>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

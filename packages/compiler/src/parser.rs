@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::error::CompileError;
+use crate::diagnostic::SourceRange as DiagnosticSourceRange;
 
 /// Extremely simplified parser for the MVP:
 /// - Detects an optional `--- ... ---` import block at the beginning.
@@ -11,64 +12,113 @@ pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
 
     let mut imports: Vec<ComponentImport> = Vec::new();
     let mut script: Option<ScriptBlock> = None;
+    let mut style: Option<StyleBlock> = None;
 
     // 1) Optional imports block at the beginning
     if rest.starts_with("---") {
-        let end_idx: Option<usize> = rest.find("---").and_then(|start: usize| {
-            // Find the next "---" after the first occurrence
-            let tail: &str = &rest[start + 3..];
+        let end_idx = rest.find("---").and_then(|start: usize| {
+            let tail = &rest[start + 3..];
             tail.find("---").map(|i: usize| start + 3 + i)
         });
 
-        let end_idx: usize = end_idx.ok_or_else(|| {
-            CompileError::Syntax("imports block '---' without closing '---'".into())
+        let end_idx = end_idx.ok_or_else(|| {
+            CompileError::Syntax {
+                message: "imports block '---' without closing '---'".into(),
+                range: Some(DiagnosticSourceRange { start: 0, end: 3 }),
+            }
         })?;
 
-        let imports_block: &str = &rest[3..end_idx];
+        let imports_block = &rest[3..end_idx];
         imports = parse_imports_block(imports_block)?;
-
-        rest = &rest[end_idx + 3..];
+        rest = &rest[end_idx + 3..].trim_start();
     }
 
-    // 2) Optional <script> block
-    if let Some(script_start) = rest.find("<script>") {
-        if script_start != 0 {
-            // For now, treat anything before <script> as part of the template
+    // 2) Optional <script> and <style> blocks (looping to allow any order)
+    loop {
+        rest = rest.trim_start();
+        if rest.starts_with("<script>") {
+            if script.is_some() {
+                return Err(CompileError::Syntax {
+                    message: "only one <script> block is allowed".into(),
+                    range: None,
+                });
+            }
+            let after_open = "<script>".len();
+            let script_end = rest[after_open..]
+                .find("</script>")
+                .ok_or_else(|| {
+                    let start = rest.as_ptr() as usize - source_base_ptr;
+                    CompileError::Syntax {
+                        message: "<script> without closing </script>".into(),
+                        range: Some(DiagnosticSourceRange {
+                            start,
+                            end: start + after_open,
+                        }),
+                    }
+                })?;
+            let script_code = &rest[after_open..after_open + script_end];
+            let abs_start = (rest.as_ptr() as usize - source_base_ptr) + after_open;
+            
+            script = Some(ScriptBlock {
+                code: script_code.to_string(),
+                span: Some(SourceRange {
+                    start: abs_start,
+                    end: abs_start + script_code.len(),
+                }),
+            });
+            rest = &rest[after_open + script_end + "</script>".len()..];
+        } else if rest.starts_with("<style>") {
+            if style.is_some() {
+                return Err(CompileError::Syntax {
+                    message: "only one <style> block is allowed".into(),
+                    range: None,
+                });
+            }
+            let after_open = "<style>".len();
+            let style_end = rest[after_open..]
+                .find("</style>")
+                .ok_or_else(|| {
+                    let start = rest.as_ptr() as usize - source_base_ptr;
+                    CompileError::Syntax {
+                        message: "<style> without closing </style>".into(),
+                        range: Some(DiagnosticSourceRange {
+                            start,
+                            end: start + after_open,
+                        }),
+                    }
+                })?;
+            let style_code = &rest[after_open..after_open + style_end];
+            let abs_start = (rest.as_ptr() as usize - source_base_ptr) + after_open;
+
+            style = Some(StyleBlock {
+                code: style_code.to_string(),
+                span: Some(SourceRange {
+                    start: abs_start,
+                    end: abs_start + style_code.len(),
+                }),
+            });
+            rest = &rest[after_open + style_end + "</style>".len()..];
+        } else {
+            break;
         }
-        let after_open: usize = script_start + "<script>".len();
-        let script_end: usize = rest[after_open..]
-            .find("</script>")
-            .ok_or_else(|| CompileError::Syntax("<script> without closing </script>".into()))?;
-        let script_code: &str = &rest[after_open..after_open + script_end];
-
-        let rest_base_ptr = rest.as_ptr() as usize;
-        let abs_start = (rest_base_ptr - source_base_ptr) + after_open;
-        let abs_end = abs_start + script_code.len();
-
-        script = Some(ScriptBlock {
-            code: script_code.to_string(),
-            span: Some(SourceRange {
-                start: abs_start,
-                end: abs_end,
-            }),
-        });
-
-        // resto después de </script>
-        let after_script: usize = after_open + script_end + "</script>".len();
-        rest = &rest[after_script..];
     }
 
-    let template_src: &str = rest.trim();
-    let template: Vec<TemplateNode> = if template_src.is_empty() {
+    let template_src = rest.trim();
+    let template = if template_src.is_empty() {
         Vec::new()
     } else {
-        let rest_base_ptr = rest.as_ptr() as usize;
-        let template_base_offset = rest_base_ptr - source_base_ptr;
+        let template_base_offset = rest.as_ptr() as usize - source_base_ptr;
         let mut p = MarkupParser::new(template_src, template_base_offset);
         let nodes = p.parse_nodes(None)?;
         p.skip_ws();
         if !p.is_eof() {
-            return Err(CompileError::Template("unexpected trailing input in template".into()));
+            return Err(CompileError::Template {
+                message: "unexpected trailing input in template".into(),
+                range: Some(DiagnosticSourceRange {
+                    start: p.base_offset + p.pos,
+                    end: source.len(),
+                }),
+            });
         }
         nodes
     };
@@ -76,6 +126,7 @@ pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
     Ok(ComponentFile {
         imports,
         script,
+        style,
         template,
     })
 }
@@ -89,34 +140,38 @@ fn parse_imports_block(block: &str) -> Result<Vec<ComponentImport>, CompileError
             continue;
         }
         if !line.starts_with("import ") {
-            return Err(CompileError::Syntax(format!(
-                "invalid import line in imports block: {line}"
-            )));
+            return Err(CompileError::Syntax {
+                message: format!("invalid import line in imports block: {line}"),
+                range: None, // Simplified for now
+            });
         }
         // Parse `import ... from "./X.lumin"`
         let from_idx: usize = line.find("from ").ok_or_else(|| {
-            CompileError::Syntax(format!(
-                "import without 'from' in imports block: {line}"
-            ))
+            CompileError::Syntax {
+                message: format!("import without 'from' in imports block: {line}"),
+                range: None,
+            }
         })?;
         let spec_part: &str = line["import ".len()..from_idx].trim();
-        let source_part: &str = line[from_idx + 5..].trim();
+        let source_part: &str = line[from_idx + 5..].trim().trim_end_matches(';');
         let source: String = source_part
-            .trim_matches('"')
-            .trim_matches('"')
+            .trim()
+            .trim_matches(|c| c == '"' || c == '\'')
             .to_string();
 
         if !source.ends_with(".lumin") {
-            return Err(CompileError::InvalidStructure(format!(
-                "only .lumin component imports are allowed in the --- block: {source}"
-            )));
+            return Err(CompileError::InvalidStructure {
+                message: format!("only .lumin component imports are allowed in the --- block: {source}"),
+                range: None,
+            });
         }
 
         let specifiers = parse_import_specifiers(spec_part)?;
         if specifiers.is_empty() {
-            return Err(CompileError::Syntax(format!(
-                "import missing specifiers: {line}"
-            )));
+            return Err(CompileError::Syntax {
+                message: format!("import missing specifiers: {line}"),
+                range: None,
+            });
         }
 
         imports.push(ComponentImport { specifiers, source });
@@ -135,16 +190,20 @@ fn parse_import_specifiers(spec: &str) -> Result<Vec<ImportSpecifier>, CompileEr
     if !spec.starts_with('{') {
         // Could be `Name` or `Name, { X }` (not supported yet)
         if spec.contains(',') {
-            return Err(CompileError::Syntax(
-                "combined default + named imports are not supported yet".into(),
-            ));
+            return Err(CompileError::Syntax {
+                message: "combined default + named imports are not supported yet".into(),
+                range: None,
+            });
         }
         return Ok(vec![ImportSpecifier::Default(spec.to_string())]);
     }
 
     // Named import list: `{ A, B as C }`
     if !spec.ends_with('}') {
-        return Err(CompileError::Syntax("named imports missing closing '}'".into()));
+        return Err(CompileError::Syntax {
+            message: "named imports missing closing '}'".into(),
+            range: None,
+        });
     }
     let inner = spec[1..spec.len() - 1].trim();
     if inner.is_empty() {
@@ -221,7 +280,13 @@ impl<'a> MarkupParser<'a> {
             self.pos += s.len();
             Ok(())
         } else {
-            Err(CompileError::Template(format!("expected '{s}'")))
+            Err(CompileError::Template {
+                message: format!("expected '{s}'"),
+                range: Some(DiagnosticSourceRange {
+                    start: self.base_offset + self.pos,
+                    end: self.base_offset + self.pos + 1, // Approx
+                }),
+            })
         }
     }
 
@@ -238,16 +303,24 @@ impl<'a> MarkupParser<'a> {
 
                 if let Some(expected) = closing_tag {
                     if name != expected {
-                        return Err(CompileError::Template(format!(
-                            "mismatched closing tag </{name}>; expected </{expected}>"
-                        )));
+                        return Err(CompileError::Template {
+                            message: format!("mismatched closing tag </{name}>; expected </{expected}>"),
+                            range: Some(DiagnosticSourceRange {
+                                start: self.base_offset + self.pos - (name.len() + 3), // approx backtrace
+                                end: self.base_offset + self.pos,
+                            }),
+                        });
                     }
                     return Ok(nodes);
                 }
 
-                return Err(CompileError::Template(format!(
-                    "unexpected closing tag </{name}>"
-                )));
+                return Err(CompileError::Template {
+                    message: format!("unexpected closing tag </{name}>"),
+                    range: Some(DiagnosticSourceRange {
+                        start: self.base_offset + self.pos - (name.len() + 3),
+                        end: self.base_offset + self.pos,
+                    }),
+                });
             }
 
             if self.starts_with("<") {
@@ -269,9 +342,13 @@ impl<'a> MarkupParser<'a> {
         }
 
         if let Some(expected) = closing_tag {
-            return Err(CompileError::Template(format!(
-                "unclosed tag <{expected}>"
-            )));
+            return Err(CompileError::Template {
+                message: format!("unclosed tag <{expected}>"),
+                range: Some(DiagnosticSourceRange {
+                    start: self.base_offset + self.pos, // EOF usually
+                    end: self.base_offset + self.pos,
+                }),
+            });
         }
 
         Ok(nodes)
@@ -291,7 +368,13 @@ impl<'a> MarkupParser<'a> {
     fn parse_element(&mut self) -> Result<ElementNode, CompileError> {
         self.expect("<")?;
         if self.starts_with("/") {
-            return Err(CompileError::Template("unexpected closing tag".into()));
+            return Err(CompileError::Template {
+                message: "unexpected closing tag".into(),
+                range: Some(DiagnosticSourceRange {
+                    start: self.base_offset + self.pos,
+                    end: self.base_offset + self.pos + 2,
+                }),
+            });
         }
 
         let (tag_name, tag_span) = self.parse_tag_name_with_span()?;
@@ -347,7 +430,13 @@ impl<'a> MarkupParser<'a> {
             }
         }
         if self.pos == start {
-            return Err(CompileError::Template("expected tag name".into()));
+            return Err(CompileError::Template {
+                message: "expected tag name".into(),
+                range: Some(DiagnosticSourceRange {
+                    start: self.base_offset + self.pos,
+                    end: self.base_offset + self.pos + 1,
+                }),
+            });
         }
         Ok(self.input[start..self.pos].to_string())
     }
@@ -358,7 +447,13 @@ impl<'a> MarkupParser<'a> {
         loop {
             self.skip_ws();
             if self.is_eof() {
-                return Err(CompileError::Template("unexpected end of input while parsing tag".into()));
+                return Err(CompileError::Template {
+                    message: "unexpected end of input while parsing tag".into(),
+                    range: Some(DiagnosticSourceRange {
+                        start: self.base_offset + self.pos,
+                        end: self.base_offset + self.pos,
+                    }),
+                });
             }
             if self.starts_with(">") || self.starts_with("/>") {
                 break;
@@ -391,9 +486,13 @@ impl<'a> MarkupParser<'a> {
                     continue;
                 }
 
-                return Err(CompileError::Template(format!(
-                    "invalid attribute value for '{name}'"
-                )));
+                return Err(CompileError::Template {
+                    message: format!("invalid attribute value for '{name}'"),
+                    range: Some(DiagnosticSourceRange {
+                        start: self.base_offset + self.pos,
+                        end: self.base_offset + self.pos + 1,
+                    }),
+                });
             }
 
             // Boolean attribute
@@ -416,7 +515,13 @@ impl<'a> MarkupParser<'a> {
             }
         }
         if self.pos == start {
-            return Err(CompileError::Template("expected attribute name".into()));
+            return Err(CompileError::Template {
+                message: "expected attribute name".into(),
+                range: Some(DiagnosticSourceRange {
+                    start: self.base_offset + self.pos,
+                    end: self.base_offset + self.pos + 1,
+                }),
+            });
         }
         Ok(self.input[start..self.pos].to_string())
     }
@@ -424,7 +529,13 @@ impl<'a> MarkupParser<'a> {
     fn parse_quoted_string(&mut self, quote: char) -> Result<String, CompileError> {
         let first = self.consume_char();
         if first != Some(quote) {
-            return Err(CompileError::Template("expected quoted string".into()));
+            return Err(CompileError::Template {
+                message: "expected quoted string".into(),
+                range: Some(DiagnosticSourceRange {
+                    start: self.base_offset + self.pos,
+                    end: self.base_offset + self.pos + 1,
+                }),
+            });
         }
         let start = self.pos;
         while let Some(c) = self.peek_char() {
@@ -443,7 +554,13 @@ impl<'a> MarkupParser<'a> {
             }
             self.consume_char();
         }
-        Err(CompileError::Template("unterminated string literal".into()))
+        Err(CompileError::Template {
+            message: "unterminated string literal".into(),
+            range: Some(DiagnosticSourceRange {
+                start: self.base_offset + start,
+                end: self.base_offset + self.pos,
+            }),
+        })
     }
 
     fn parse_braced_js_expr(&mut self) -> Result<JsExpr, CompileError> {
@@ -458,7 +575,13 @@ impl<'a> MarkupParser<'a> {
 
         while !self.is_eof() {
             let c = self.consume_char().ok_or_else(|| {
-                CompileError::Template("'{' expression without matching '}' in template".into())
+                CompileError::Template {
+                    message: "'{' expression without matching '}' in template".into(),
+                    range: Some(DiagnosticSourceRange {
+                        start: self.base_offset + _brace_start,
+                        end: self.base_offset + self.pos,
+                    }),
+                }
             })?;
 
             if escaped {
@@ -514,7 +637,14 @@ impl<'a> MarkupParser<'a> {
                     let expr_src = &self.input[start..end];
                     let expr_trimmed = expr_src.trim();
                     if expr_trimmed.is_empty() {
-                        return Err(CompileError::Template("empty {} expression in template".into()));
+                        // TODO: use range
+                        return Err(CompileError::Template {
+                            message: "empty {} expression in template".into(),
+                            range: Some(DiagnosticSourceRange {
+                                start: self.base_offset + start,
+                                end: self.base_offset + end,
+                            }),
+                        });
                     }
                     // Compute absolute offsets for diagnostics.
                     let leading_ws = expr_src.len() - expr_src.trim_start().len();
@@ -535,8 +665,12 @@ impl<'a> MarkupParser<'a> {
             }
         }
 
-        Err(CompileError::Template(
-            "'{' expression without matching '}' in template".into(),
-        ))
+        Err(CompileError::Template {
+            message: "'{' expression without matching '}' in template".into(),
+            range: Some(DiagnosticSourceRange {
+                start: self.base_offset + _brace_start,
+                end: self.base_offset + self.pos,
+            }),
+        })
     }
 }

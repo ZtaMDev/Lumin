@@ -1,0 +1,29 @@
+{
+  "name": "@luminjs/compiler",
+  "version": "0.1.0",
+  "description": "The high-performance LuminJS compiler",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "luminc": "bin/luminc.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "luminjs",
+    "compiler",
+    "rust"
+  ],
+  "author": "LuminJS Team",
+  "license": "MIT",
+  "dependencies": {
+    "execa": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.9",
+    "@types/node": "^25.2.3",
+    "typescript": "^5.0.0"
+  }
+}
