@@ -1,0 +1,8 @@
+---
+import Counter from "./Counter.lumin"
+---
+
+<div>
+  <Counter />
+  <Counter />
+</div>

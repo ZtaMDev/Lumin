@@ -1,0 +1,17 @@
+{
+  "name": "@luminjs/monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LuminJS monorepo - compiler, runtime, and Vite plugin",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r dev",
+    "test": "cargo test && pnpm -r test"
+  },
+  "devDependencies": {
+    "pnpm": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

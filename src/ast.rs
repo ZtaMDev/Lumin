@@ -1,0 +1,60 @@
+#[derive(Debug, Clone)]
+pub struct ComponentFile {
+    pub imports: Vec<ComponentImport>,
+    pub script: Option<ScriptBlock>,
+    pub template: Vec<TemplateNode>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceRange {
+    pub start: usize,
+    pub end: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct ComponentImport {
+    pub specifiers: Vec<ImportSpecifier>,
+    pub source: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum ImportSpecifier {
+    Default(String),
+    Named(String),
+    NamedAlias { local: String, imported: String },
+}
+
+#[derive(Debug, Clone)]
+pub struct ScriptBlock {
+    pub code: String,
+    pub span: Option<SourceRange>,
+}
+
+#[derive(Debug, Clone)]
+pub struct JsExpr {
+    pub code: String,
+    pub span: Option<SourceRange>,
+}
+
+#[derive(Debug, Clone)]
+pub enum TemplateNode {
+    Element(ElementNode),
+    Text(String),
+    Expr(JsExpr),
+}
+
+#[derive(Debug, Clone)]
+pub struct ElementNode {
+    pub tag_name: String,
+    pub tag_span: Option<SourceRange>,
+    pub attributes: Vec<AttributeNode>,
+    pub children: Vec<TemplateNode>,
+    pub self_closing: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum AttributeNode {
+    Static { name: String, value: String },
+    Dynamic { name: String, expr: JsExpr },
+    EventHandler { name: String, expr: JsExpr },
+}
