@@ -194,7 +194,7 @@ fn run_build(
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>LuminJS MVP</title>
+    <title>LuminJS App</title>
   </head>
   <body>
     <div id="app"></div>
@@ -214,7 +214,7 @@ fn run_build(
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>LuminJS MVP</title>
+    <title>LuminJS App</title>
   </head>
   <body>
     <div id="app"></div>

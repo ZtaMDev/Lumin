@@ -1,0 +1,24 @@
+<script>
+  export let title;
+  export let count;
+  export let active = false;
+</script>
+
+<div class="card" style={active ? "border: 2px solid blue; background: #f0f8ff;" : "border: 1px solid #ccc;"}>
+  <h2>{title}</h2>
+  <p>Count Value: {count}</p>
+  <p>Status: {active ? "Active" : "Inactive"}</p>
+</div>
+
+<style>
+  .card {
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 8px;
+    font-family: sans-serif;
+  }
+  h2 {
+    margin-top: 0;
+    color: #333;
+  }
+</style>

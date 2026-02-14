@@ -32,8 +32,21 @@ pub enum ImportSpecifier {
 }
 
 #[derive(Debug, Clone)]
+pub struct Prop {
+    pub name: String,
+    pub default_value: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScriptImport {
+    pub code: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct ScriptBlock {
     pub code: String,
+    pub imports: Vec<ScriptImport>,
+    pub props: Vec<Prop>,
     pub span: Option<SourceRange>,
 }
 

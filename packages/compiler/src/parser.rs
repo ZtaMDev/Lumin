@@ -2,10 +2,14 @@ use crate::ast::*;
 use crate::error::CompileError;
 use crate::diagnostic::SourceRange as DiagnosticSourceRange;
 
-/// Extremely simplified parser for the MVP:
+use swc_common::{FileName, SourceMap, Spanned};
+use swc_ecma_ast::{ModuleDecl, ModuleItem, Decl, Pat};
+use swc_ecma_parser::{EsConfig, Parser, StringInput, Syntax};
+
+/// Robust parser for LuminJS components:
 /// - Detects an optional `--- ... ---` import block at the beginning.
-/// - Detects a single `<script>...</script>` block.
-/// - Treats the rest as a flat template string (without deep tag parsing yet).
+/// - Detects `<script>` and `<style>` blocks in any order.
+/// - Parses the template as a reactive DOM.
 pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
     let mut parser = MarkupParser::new(source, 0);
     let mut component = ComponentFile {
@@ -54,8 +58,13 @@ pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
             if let Some(end) = end_idx {
                 let code = &parser.input[parser.pos..parser.pos + end];
                 let abs_start = parser.base_offset + parser.pos;
+                
+                let (cleaned_code, props, imports) = parse_script_block_contents(code)?;
+
                 component.script = Some(ScriptBlock {
-                    code: code.to_string(),
+                    code: cleaned_code,
+                    props,
+                    imports,
                     span: Some(SourceRange {
                         start: abs_start,
                         end: abs_start + code.len(),
@@ -167,6 +176,83 @@ fn parse_imports_block(block: &str) -> Result<Vec<ComponentImport>, CompileError
     }
 
     Ok(imports)
+}
+
+fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<ScriptImport>), CompileError> {
+    let cm: SourceMap = Default::default();
+    let fm = cm.new_source_file(FileName::Custom("script.js".into()), code.to_string());
+    
+    let syntax = Syntax::Es(EsConfig {
+        ..Default::default()
+    });
+
+    let mut parser = Parser::new(syntax, StringInput::from(&*fm), None);
+    let module = match parser.parse_module() {
+        Ok(m) => m,
+        Err(e) => {
+             return Err(CompileError::Template {
+                 message: format!("JS parse error in <script>: {}", e.kind().msg()),
+                 range: None,
+             });
+        }
+    };
+
+    let mut props = Vec::new();
+    let mut imports = Vec::new();
+    let mut cleaned_code = code.to_string();
+    let mut offsets_to_strip = Vec::new();
+
+    for item in module.body {
+        match item {
+            ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl)) => {
+                let span = import_decl.span;
+                let start = (span.lo.0 - fm.start_pos.0) as usize;
+                let end = (span.hi.0 - fm.start_pos.0) as usize;
+                offsets_to_strip.push((start, end));
+                
+                imports.push(ScriptImport {
+                    code: code[start..end].to_string(),
+                });
+            }
+            ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(export_decl)) => {
+                if let Decl::Var(var_decl) = &export_decl.decl {
+                    // Strip the entire declaration to avoid redeclaration error
+                    let span = export_decl.span;
+                    let start = (span.lo.0 - fm.start_pos.0) as usize;
+                    let end = (span.hi.0 - fm.start_pos.0) as usize;
+                    offsets_to_strip.push((start, end));
+
+                    for decl in &var_decl.decls {
+                        if let Pat::Ident(ident) = &decl.name {
+                            let name = ident.id.sym.to_string();
+                            let mut default_value = None;
+                            
+                            if let Some(init) = &decl.init {
+                                let lo = (init.span().lo.0 - fm.start_pos.0) as usize;
+                                let hi = (init.span().hi.0 - fm.start_pos.0) as usize;
+                                if lo < hi && hi <= code.len() {
+                                    default_value = Some(code[lo..hi].to_string());
+                                }
+                            }
+                            props.push(Prop { name, default_value });
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Strip in reverse order
+    offsets_to_strip.sort_by_key(|&(s, _)| std::cmp::Reverse(s));
+    for (start, end) in offsets_to_strip {
+        if start < end && end <= cleaned_code.len() {
+            let len = end - start;
+            cleaned_code.replace_range(start..end, &" ".repeat(len));
+        }
+    }
+
+    Ok((cleaned_code, props, imports))
 }
 
 fn parse_import_specifiers(spec: &str) -> Result<Vec<ImportSpecifier>, CompileError> {

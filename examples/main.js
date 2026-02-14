@@ -1,5 +1,5 @@
 import { hydrate } from "@luminjs/runtime";
-import App from "./ControlFlowDemo.lumin";
+import App from "./PropsDemo.lumin";
 
 const root = document.getElementById("app");
 if (root) {
