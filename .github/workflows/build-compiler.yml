@@ -23,7 +23,7 @@ jobs:
             artifact: luminjs-linux-arm64
             binary: luminjs
           - target: x86_64-apple-darwin
-            os: macos-12
+            os: macos-14
             artifact: luminjs-darwin-x64
             binary: luminjs
           - target: aarch64-apple-darwin
