@@ -2,37 +2,63 @@ import execa from "execa";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-// Determine the path to the binary
-// In development, it might be in target/debug
-// In production, we might ship it or download it.
-// For this monorepo setup, we assume we invoke `luminc` from the bin/luminc.js wrapper or directly locate the binary.
-// Actually, let's just assume `cargo run` or locate the binary if built.
+import os from "os";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const packageRoot = path.resolve(__dirname, ".."); // dist/ -> package root
+// ─── Binary Resolution ─────────────────────────────────────
+function getBinaryName() {
+    const platform = os.platform(); // 'linux', 'darwin', 'win32'
+    const arch = os.arch(); // 'x64', 'arm64'
+    const archKey = arch === "arm64" ? "arm64" : "x64";
+    const ext = platform === "win32" ? ".exe" : "";
+    return `luminjs-${platform}-${archKey}${ext}`;
+}
+function findBinary() {
+    const binName = getBinaryName();
+    const binPath = path.join(packageRoot, "bin", binName);
+    if (fs.existsSync(binPath)) {
+        return binPath;
+    }
+    return null;
+}
 export async function compile(options) {
-    // We utilize `cargo run` to execute the compiler binary.
-    const manifestPath = path.join(packageRoot, "Cargo.toml");
-    // Construct arguments for the CLI
-    const args = [
-        "run",
-        "--manifest-path",
-        manifestPath,
-        "--quiet",
-        "--",
+    const tempOutDir = path.join(packageRoot, ".temp_build");
+    // Build CLI arguments (shared between binary and cargo run)
+    const cliArgs = [
         "build",
         options.input,
+        "--out",
+        tempOutDir,
+        "--format",
+        "json",
     ];
-    // Use a temporary directory for output
-    const tempOutDir = path.join(packageRoot, ".temp_build");
-    args.push("--out", tempOutDir);
     if (options.bundle === false) {
-        args.push("--no-bundle");
+        cliArgs.push("--no-bundle");
     }
-    args.push("--format", "json");
+    // Try pre-compiled binary first, fall back to cargo run
+    const binary = findBinary();
+    let command;
+    let args;
+    if (binary) {
+        command = binary;
+        args = cliArgs;
+    }
+    else {
+        // Fallback: compile via cargo run (requires Rust toolchain)
+        const manifestPath = path.join(packageRoot, "Cargo.toml");
+        command = "cargo";
+        args = [
+            "run",
+            "--manifest-path",
+            manifestPath,
+            "--quiet",
+            "--",
+            ...cliArgs,
+        ];
+    }
     try {
-        await execa("cargo", args); // Execute cargo
-        // The filename is derived from input filename.
+        await execa(command, args);
         const filename = path.basename(options.input, ".lumin") + ".js";
         const outPath = path.join(tempOutDir, filename);
         if (!fs.existsSync(outPath)) {
@@ -48,7 +74,7 @@ export async function compile(options) {
                 json = JSON.parse(e.stdout);
             }
             catch (_parseErr) {
-                // stdout wasn't valid JSON, fall through to throw raw error
+                // stdout wasn't valid JSON, fall through
             }
             if (json) {
                 if (json.diagnostics && json.diagnostics.length > 0) {
