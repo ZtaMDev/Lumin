@@ -4,27 +4,31 @@ import fs from "fs-extra";
 import path from "path";
 import { createRequire } from "module";
 import { spawnSync } from "child_process";
-function hasCommand(cmd) {
-    const which = process.platform === "win32" ? "where" : "which";
-    const res = spawnSync(which, [cmd], { stdio: "ignore" });
-    return res.status === 0;
+function isPackageManagerAvailable(pm) {
+    try {
+        let res = spawnSync(pm, ["--version"], { stdio: "ignore" });
+        if (res.error) {
+            const err = res.error;
+            if (process.platform === "win32" && err.code === "ENOENT" && (pm === "npm" || pm === "pnpm")) {
+                res = spawnSync("cmd", ["/c", pm, "--version"], { stdio: "ignore" });
+            }
+        }
+        return res.status === 0;
+    }
+    catch {
+        return false;
+    }
 }
 function detectPackageManager() {
-    if (hasCommand("bun"))
+    if (isPackageManagerAvailable("bun"))
         return "bun";
-    if (hasCommand("pnpm"))
+    if (isPackageManagerAvailable("pnpm"))
         return "pnpm";
     return "npm";
 }
 function getInstalledPackageManagers() {
-    const out = [];
-    if (hasCommand("bun"))
-        out.push("bun");
-    if (hasCommand("pnpm"))
-        out.push("pnpm");
-    // npm is assumed to exist if node exists; but still keep it as fallback.
-    out.push("npm");
-    return Array.from(new Set(out));
+    // Always show the main options; availability will be handled at install time.
+    return ["bun", "pnpm", "npm"];
 }
 function runDevCommand(pm) {
     if (pm === "npm")
@@ -38,17 +42,35 @@ function installCommand(pm) {
 }
 function runInstall(pm, cwd) {
     const cmd = pm;
-    const args = pm === "npm" ? ["install"] : ["install"];
-    const res = spawnSync(cmd, args, { cwd, stdio: "inherit" });
-    if (res.error)
-        throw res.error;
+    const args = ["install"];
+    let res = spawnSync(cmd, args, { cwd, encoding: "utf8" });
+    if (res.error) {
+        // On Windows, npm/pnpm may be available through cmd resolution even if not directly spawnable.
+        const err = res.error;
+        if (process.platform === "win32" && err.code === "ENOENT" && (pm === "npm" || pm === "pnpm")) {
+            res = spawnSync("cmd", ["/c", pm, ...args], { cwd, encoding: "utf8" });
+        }
+        else {
+            throw res.error;
+        }
+    }
     if (res.signal === "SIGINT") {
         const err = new Error("install interrupted");
         err.code = "SIGINT";
         throw err;
     }
     if (typeof res.status === "number" && res.status !== 0) {
-        throw new Error(`${cmd} install failed with exit code ${res.status}`);
+        const failure = {
+            pm,
+            status: res.status ?? null,
+            signal: res.signal ?? null,
+            stdout: String(res.stdout || ""),
+            stderr: String(res.stderr || ""),
+        };
+        const err = new Error(`${cmd} install failed`);
+        err.code = "INSTALL_FAILED";
+        err.failure = failure;
+        throw err;
     }
 }
 function isEnoentSpawnError(e) {
@@ -56,6 +78,11 @@ function isEnoentSpawnError(e) {
 }
 function isSigintError(e) {
     return Boolean(e && typeof e === "object" && "code" in e && e.code === "SIGINT");
+}
+function getInstallFailure(e) {
+    return Boolean(e && typeof e === "object" && e.code === "INSTALL_FAILED" && e.failure)
+        ? e.failure
+        : null;
 }
 function getTemplates() {
     return [
@@ -162,35 +189,30 @@ export async function createLumixApp(name, options) {
                     process.exit(0);
                 }
                 if (isEnoentSpawnError(e)) {
-                    const fallback = detectedPm;
-                    if (fallback !== packageManager && hasCommand(fallback)) {
-                        console.log(pc.yellow(`\n  ${packageManager} not found. Retrying with ${fallback}...`));
-                        try {
-                            packageManager = fallback;
-                            runInstall(packageManager, targetDir);
-                            console.log(pc.green(pc.bold("\n  Dependencies installed.")));
-                        }
-                        catch (e2) {
-                            if (isSigintError(e2)) {
-                                console.log(pc.red("\n  Aborted.\n"));
-                                process.exit(0);
-                            }
-                            console.log(pc.red(`\n  Failed to install dependencies: ${e2?.message || e2}`));
-                            console.log(pc.dim("  Project created at:"));
-                            console.log(`    ${targetDir}\n`);
-                        }
-                    }
-                    else {
-                        console.log(pc.red(`\n  Failed to install dependencies: ${e?.message || e}`));
-                        console.log(pc.dim("  Project created at:"));
-                        console.log(`    ${targetDir}\n`);
-                    }
+                    console.log(pc.red(`\n  Failed to install dependencies: ${packageManager} not found`));
                 }
                 else {
-                    console.log(pc.red(`\n  Failed to install dependencies: ${e?.message || e}`));
-                    console.log(pc.dim("  Project created at:"));
-                    console.log(`    ${targetDir}\n`);
+                    console.log(pc.red(`\n  Failed to install dependencies using ${packageManager}.`));
                 }
+                const failure = getInstallFailure(e);
+                if (failure) {
+                    const out = `${failure.stdout}${failure.stderr}`.trim();
+                    if (out) {
+                        console.log(pc.dim("\n  Output:"));
+                        console.log(out);
+                    }
+                }
+                else if (e?.message) {
+                    console.log(pc.dim("\n  Output:"));
+                    console.log(String(e.message));
+                }
+                console.log(pc.dim("\n  Project created at:"));
+                console.log(`    ${targetDir}\n`);
+                console.log(pc.dim("  You can try installing with a different package manager:"));
+                console.log(`    cd ${projectName}`);
+                console.log("    npm install");
+                console.log("    pnpm install");
+                console.log("    bun install\n");
             }
         }
         console.log(pc.dim("\n  Next steps:"));

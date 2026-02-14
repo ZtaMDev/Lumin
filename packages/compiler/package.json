@@ -1,7 +1,7 @@
 {
   "name": "@lumix-js/compiler",
-  "version": "0.1.0",
-  "description": "The high-performance LuminJS compiler",
+  "version": "0.1.1",
+  "description": "The high-performance LumixJS compiler",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
