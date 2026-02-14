@@ -13,6 +13,10 @@ owo-colors = "4.0"
 swc_common = "0.33"
 swc_ecma_parser = "0.143"
 swc_ecma_ast = "0.112"
+swc_ecma_codegen = "0.148"
+swc_ecma_transforms_base = "0.137"
+swc_ecma_transforms_typescript = "0.188"
+swc_ecma_visit = "0.98"
 
 [dev-dependencies]
 pretty_assertions = "1.4"

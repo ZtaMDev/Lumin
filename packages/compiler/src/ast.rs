@@ -32,10 +32,17 @@ pub enum ImportSpecifier {
     NamedAlias { local: String, imported: String },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PropKind {
+    Prop,
+    Signal,
+}
+
 #[derive(Debug, Clone)]
 pub struct Prop {
     pub name: String,
     pub default_value: Option<String>,
+    pub kind: PropKind,
 }
 
 #[derive(Debug, Clone)]

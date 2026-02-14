@@ -1,6 +1,8 @@
 ---
 import MyLayout from "./MyLayout.lumin"
 import ControlFlowDemo from "./ControlFlowDemo.lumin"
+import FormDemo from "./FormDemo.lumin"
+import StyledCounter from "./StyledCounter.lumin"
 ---
 
 <script>
@@ -30,6 +32,9 @@ import ControlFlowDemo from "./ControlFlowDemo.lumin"
   </MyLayout>
 
   <ControlFlowDemo />
+  <FormDemo />
+  <StyledCounter />
+
 </div>
 
 <style>

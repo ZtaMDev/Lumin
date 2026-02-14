@@ -1,5 +1,8 @@
 use crate::ast::*;
 use std::collections::HashMap;
+use crate::transpiler::transpile_ts_snippet;
+
+// transpile_ts_to_js moved to transpiler::transpile_ts_snippet
 
 pub fn generate_js(component: &ComponentFile, component_name: &str) -> String {
     generate_component_js_esm(component, component_name)
@@ -34,14 +37,18 @@ pub fn generate_component_js_esm(component: &ComponentFile, component_name: &str
     // Hoist <script> imports
     if let Some(script) = &component.script {
         for imp in &script.imports {
+            // Already transpiled in parser
             out.push_str(&imp.code);
             out.push('\n');
         }
     }
     out.push('\n');
     
-    let script_body = component.script.as_ref().map(|s| s.code.as_str()).unwrap_or("");
-    out.push_str(&generate_component_body(component, true, script_body, component_name));
+    let script_body_raw = component.script.as_ref().map(|s| s.code.as_str()).unwrap_or("");
+    // Already transpiled in parser
+    let script_body = script_body_raw.to_string();
+    
+    out.push_str(&generate_component_body(component, true, &script_body, component_name));
 
     out.push_str("\nexport function hydrate(root, props) {\n");
     out.push_str(&format!("  __LUMIN__.hydrate(root, {}, props);\n", component_name));
@@ -55,11 +62,13 @@ pub fn generate_component_factory_js(name: &str, component: &ComponentFile) -> S
 
     out.push_str(&format!("__luminComponents[\"{}\"] = (function() {{\n", name));
     
-    let script_body = component.script.as_ref().map(|s| s.code.as_str()).unwrap_or("");
+    let script_body_raw = component.script.as_ref().map(|s| s.code.as_str()).unwrap_or("");
+    // Already transpiled in parser
+    let script_body = script_body_raw.to_string();
 
     // Use "Component" as internal name for factory
     let fn_name = "Component";
-    out.push_str(&generate_component_body(component, false, script_body, fn_name));
+    out.push_str(&generate_component_body(component, false, &script_body, fn_name));
     out.push_str(&format!("\n  return {{ default: {}, hydrate: (root, props) => __LUMIN__.hydrate(root, {}, props) }};\n", fn_name, fn_name));
     out.push_str("})();\n");
 
@@ -78,7 +87,7 @@ fn generate_component_body(component: &ComponentFile, is_esm: bool, script_body:
             let mut required_props = Vec::new();
             for prop in &script.props {
                 if let Some(default) = &prop.default_value {
-                    destructuring.push(format!("{} = {}", prop.name, default));
+                    destructuring.push(format!("{} = {}", prop.name, transpile_ts_snippet(default).trim()));
                 } else {
                     destructuring.push(prop.name.clone());
                     required_props.push(prop.name.clone());
@@ -151,7 +160,7 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool, strip_sl
             s.push_str(&format!("`{}`", escape_backticks(t)));
         }
         TemplateNode::Expr(expr) => {
-            s.push_str(&format!("() => ({})", expr.code));
+            s.push_str(&format!("() => ({})", transpile_ts_snippet(&expr.code).trim()));
         }
         TemplateNode::Slot(slot) => {
             let is_default = slot.name.is_none();
@@ -186,7 +195,7 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool, strip_sl
                     else_branch,
                 } => {
                     s.push_str("__LUMIN__.__if(() => (");
-                    s.push_str(&condition.code);
+                    s.push_str(transpile_ts_snippet(&condition.code).trim());
                     s.push_str("), [\n");
                     
                     // Main branch
@@ -199,12 +208,11 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool, strip_sl
                     }
                     s.push_str(&" ".repeat(indent + 2));
                     s.push_str("] },\n");
-
                     // Else-ifs
                     for (cond, branch) in else_ifs {
                         s.push_str(&" ".repeat(indent + 2));
                         s.push_str("{ cond: () => (");
-                        s.push_str(&cond.code);
+                        s.push_str(transpile_ts_snippet(&cond.code).trim());
                         s.push_str("), body: () => [\n");
                         for child in branch {
                             s.push_str(&" ".repeat(indent + 4));
@@ -239,11 +247,11 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool, strip_sl
                             .replace("let ", "")
                             .replace("const ", "")
                             .replace("var ", "")
-                            .trim()
+                                .trim()
                             .to_string();
-                        let list_part = parts[1].trim();
+                        let list_part = transpile_ts_snippet(parts[1].trim());
 
-                        s.push_str(&format!("__LUMIN__.__for(() => ({}), {} => [\n", list_part, item_part));
+                        s.push_str(&format!("__LUMIN__.__for(() => ({}), {} => [\n", list_part.trim(), item_part));
                         for child in body {
                             s.push_str(&" ".repeat(indent + 2));
                             s.push_str(&generate_node_h(child, indent + 2, is_bundle, false));
@@ -252,7 +260,7 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool, strip_sl
                         s.push_str(&" ".repeat(indent));
                         
                         if let Some(key) = key_expr {
-                            s.push_str(&format!("], {} => ({}))", item_part, key));
+                            s.push_str(&format!("], {} => ({}))", item_part, transpile_ts_snippet(key).trim()));
                         } else {
                             s.push_str("])");
                         }
@@ -322,13 +330,13 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool, strip_sl
                             s.push_str(&format!("'{}': '{}'", name, escape_backticks(value)));
                         }
                         AttributeNode::Dynamic { name, expr } => {
-                            s.push_str(&format!("'{}': () => ({})", name, expr.code));
+                            s.push_str(&format!("'{}': () => ({})", name, transpile_ts_snippet(&expr.code).trim()));
                         }
                         AttributeNode::EventHandler { name, expr } => {
-                            s.push_str(&format!("'{}': {}", name, expr.code.trim()));
+                            s.push_str(&format!("'{}': {}", name, transpile_ts_snippet(&expr.code).trim()));
                         }
                         AttributeNode::Bind { property, expr } => {
-                            s.push_str(&format!("'bind:{}': {}", property, expr.code.trim()));
+                            s.push_str(&format!("'bind:{}': {}", property, transpile_ts_snippet(&expr.code).trim()));
                         }
                     }
                     if i < el.attributes.len() - 1 || !slots.is_empty() || !default_children.is_empty() {

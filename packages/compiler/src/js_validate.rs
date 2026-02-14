@@ -1,6 +1,6 @@
 use swc_common::{FileName, SourceMap, Span, Spanned};
 use swc_ecma_ast::{ModuleDecl, ModuleItem};
-use swc_ecma_parser::{EsConfig, Parser, StringInput, Syntax};
+use swc_ecma_parser::{Parser, StringInput, Syntax, TsConfig};
 
 use crate::diagnostic::{range_to_line_cols, Diagnostic, DiagnosticSeverity, SourceRange};
 
@@ -17,10 +17,10 @@ pub fn diagnose_forbidden_lumin_imports_in_module(
     snippet_start_offset: usize,
 ) -> Vec<Diagnostic> {
     let cm: SourceMap = Default::default();
-    let fm = cm.new_source_file(FileName::Custom("lumin_script.js".into()), module_code.into());
+    let fm = cm.new_source_file(FileName::Custom("lumin_script.ts".into()), module_code.into());
 
-    let syntax = Syntax::Es(EsConfig {
-        jsx: false,
+    let syntax = Syntax::Typescript(TsConfig {
+        tsx: false,
         ..Default::default()
     });
 
@@ -72,10 +72,10 @@ pub fn validate_js_snippet(
     kind: JsSnippetKind,
 ) -> Vec<Diagnostic> {
     let cm: SourceMap = Default::default();
-    let fm = cm.new_source_file(FileName::Custom("lumin_snippet.js".into()), snippet.into());
+    let fm = cm.new_source_file(FileName::Custom("lumin_snippet.ts".into()), snippet.into());
 
-    let syntax = Syntax::Es(EsConfig {
-        jsx: false,
+    let syntax = Syntax::Typescript(TsConfig {
+        tsx: false,
         ..Default::default()
     });
 
