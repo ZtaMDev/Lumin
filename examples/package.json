@@ -11,8 +11,8 @@
   "devDependencies": {
     "vite": "^5.0.0",
     "vite-plugin-lumin": "workspace:*",
-    "@luminjs/compiler": "workspace:*",
-    "luminjs": "workspace:*",
+    "@lumin-js/compiler": "workspace:*",
+    "lumin-js": "workspace:*",
     "typescript": "^5.0.0"
   }
 }

@@ -9,7 +9,7 @@
     "preview": "lumin preview"
   },
   "dependencies": {
-    "luminjs": "latest"
+    "lumin-js": "latest"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

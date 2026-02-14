@@ -1,4 +1,4 @@
-import { compile } from "@luminjs/compiler";
+import { compile } from "@lumin-js/compiler";
 
 interface LuminConfig {
   title?: string;

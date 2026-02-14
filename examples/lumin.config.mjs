@@ -1,4 +1,4 @@
-import { defineConfig } from "luminjs";
+import { defineConfig } from "lumin-js";
 
 export default defineConfig({
   title: "LuminJS Feature Demos",

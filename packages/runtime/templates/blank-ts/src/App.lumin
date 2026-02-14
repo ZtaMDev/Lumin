@@ -1,5 +1,5 @@
 <script>
-  import { signal } from "luminjs";
+  import { signal } from "lumin-js";
   const message = signal("Hello LuminJS!");
 </script>
 

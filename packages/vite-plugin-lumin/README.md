@@ -36,7 +36,7 @@ export default defineConfig({
 
 ### Fast Transformation
 
-The plugin uses the high-performance `@luminjs/compiler` to transform `.lumin` files into optimized JavaScript modules on the fly.
+The plugin uses the high-performance `@lumin-js/compiler` to transform `.lumin` files into optimized JavaScript modules on the fly.
 
 ### Hot Module Replacement (HMR)
 

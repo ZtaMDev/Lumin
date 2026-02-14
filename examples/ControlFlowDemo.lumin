@@ -1,5 +1,5 @@
 <script>
-import { signal, onMount, onDestroy } from 'luminjs';
+import { signal, onMount, onDestroy } from 'lumin-js';
 
 let count = signal(0);
 let show = signal(true);

@@ -21,8 +21,9 @@ function inc() {
     fs::write(&input_path, source).expect("write input");
 
     let js = luminjs::compile_file(&input_path).expect("compile");
+    println!("Generated JS:\n{}", js);
 
-    assert!(js.contains("import { h, hydrate as __hydrate } from '@luminjs/runtime';"));
+    assert!(js.contains("import * as __LUMIN__ from 'lumin-js';"));
     assert!(js.contains("function Component"));
     assert!(js.contains("export default Component;"));
     assert!(js.contains("h('div'"));
@@ -131,10 +132,11 @@ import Counter from "./Counter.lumin"
     fs::write(&app_path, app).expect("write app");
 
     let res = luminjs::bundler::bundle_entry(&app_path).expect("bundle");
+    println!("Bundled JS:\n{}", res.js);
     assert!(res.diagnostics.is_empty(), "Diagnostics: {:?}", res.diagnostics);
     
     // New ESM bundle assertions
-    assert!(res.js.contains("import { h, hydrate as __hydrate } from '@luminjs/runtime';"));
+    assert!(res.js.contains("import * as __LUMIN__ from 'lumin-js';"));
     assert!(res.js.contains("const __luminComponents = {};"));
     assert!(res.js.contains("h(__luminComponents['Counter'].default, null)"));
     assert!(res.js.contains("export function hydrate(root)"));

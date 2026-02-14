@@ -20,5 +20,5 @@ bin/
 3. Extract each binary and place it here with the correct filename
 4. Commit and publish to npm
 
-The `@luminjs/compiler` package will auto-detect the platform and use the correct binary.
+The `@lumin-js/compiler` package will auto-detect the platform and use the correct binary.
 If no pre-compiled binary exists for the current platform, it falls back to `cargo run` (requires Rust).

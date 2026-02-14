@@ -1,4 +1,4 @@
-The `luminjs` package provides a modular, fine-grained reactive runtime. It is the core engine that powers state management and DOM updates, and it also contains the primary LuminJS CLI.
+The `lumin-js` package provides a modular, fine-grained reactive runtime. It is the core engine that powers state management and DOM updates, and it also contains the primary LuminJS CLI.
 
 ## CLI Core Commands
 
@@ -37,7 +37,7 @@ The runtime is built on the principle of fine-grained reactivity, using Signals 
 Signals are the primary primitive for reactive state. A signal holds a value and notifies its subscribers when that value changes.
 
 ```typescript
-import { signal } from "luminjs";
+import { signal } from "lumin-js";
 
 const count = signal(0);
 
@@ -56,7 +56,7 @@ count.value = 10;
 Effects are functions that automatically re-run whenever the signals they depend on change.
 
 ```typescript
-import { signal, effect } from "luminjs";
+import { signal, effect } from "lumin-js";
 
 const name = signal("Lumin");
 
@@ -72,7 +72,7 @@ name("World"); // Logs: "Hello, World!"
 Computed signals derive their value from other signals. They are automatically updated whenever their dependencies change.
 
 ```typescript
-import { signal, computed } from "luminjs";
+import { signal, computed } from "lumin-js";
 
 const first = signal("John");
 const last = signal("Doe");
@@ -94,7 +94,7 @@ LuminJS provides hooks for managing component lifecycles.
 For complex state that needs to be shared across components or persisted, LuminJS provides a robust Store system.
 
 ```typescript
-import { store, persist } from "luminjs";
+import { store, persist } from "lumin-js";
 
 // Create a reactive store
 const auth = store({
@@ -120,7 +120,7 @@ The `bind` helper simplifies the synchronization between UI elements and signals
 
 ```svelte
 <script>
-  import { signal, bind } from "luminjs";
+  import { signal, bind } from "lumin-js";
 
   const email = signal("");
 </script>

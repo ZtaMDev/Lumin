@@ -22,7 +22,7 @@ The goal of LuminJS is to provide an "Astro-like" experience where performance i
 The LuminJS CLI is the primary tool for creating and managing projects. Install it globally via npm:
 
 ```bash
-npm install -g luminjs
+npm install -g lumin-js
 ```
 
 ## Getting Started
@@ -44,7 +44,7 @@ LuminJS components use a `.lumin` extension. Logic and markup are co-located for
 
 ```svelte
 <script>
-  import { signal } from "luminjs";
+  import { signal } from "lumin-js";
 
   const count = signal(0);
 
@@ -63,7 +63,7 @@ LuminJS provides a robust syntax for conditional and iterative rendering using t
 
 ```svelte
 <script>
-  import { signal } from "luminjs";
+  import { signal } from "lumin-js";
 
   const show = signal(true);
   const items = signal(["Rust", "TypeScript", "LuminJS"]);
@@ -90,7 +90,7 @@ LuminJS provides a robust syntax for conditional and iterative rendering using t
 
 LuminJS is organized as a monorepo:
 
-- **[compiler](packages/compiler)**: The Rust-powered core and Node.js validation bridge.
+- **[compiler](packages/compiler)**: The Rust-powered core (`@lumin-js/compiler`) and Node.js validation bridge.
 - **[runtime](packages/runtime)**: The reactive core, lifecycle hooks, and CLI.
 - **[vite-plugin-lumin](packages/vite-plugin-lumin)**: The official Vite integration.
 

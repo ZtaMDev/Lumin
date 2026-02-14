@@ -1,4 +1,4 @@
-# @luminjs/compiler
+# @lumin-js/compiler
 
 The LuminJS compiler is a high-performance, native toolchain built with Rust. It provides robust parsing, semantic TypeScript validation, and optimized code generation for LuminJS components.
 
@@ -18,14 +18,14 @@ The compiler consists of a Rust core (`luminc`) and a Node.js wrapper that provi
 
 ## CLI Usage
 
-The compiler includes the `lumin-{platform}-{arch}` binary for direct use in build pipelines.
+The compiler includes the `luminjs-{platform}-{arch}` binary for direct use in build pipelines.
 
 ```bash
 # Basic compilation to JSON output (for integration)
-./lumin-win32-x64.exe build App.lumin --format json
+./luminjs-win32-x64.exe build App.lumin --format json
 
 # Production build with no emit (dry run)
-./lumin-win32-x64.exe build App.lumin --no-emit
+./luminjs-win32-x64.exe build App.lumin --no-emit
 ```
 
 ## Node.js API
@@ -33,7 +33,7 @@ The compiler includes the `lumin-{platform}-{arch}` binary for direct use in bui
 The package provides a high-level `compile` function for use in Node.js scripts or Vite plugins.
 
 ```typescript
-import { compile } from "@luminjs/compiler";
+import { compile } from "@lumin-js/compiler";
 
 const code = await compile({
   input: "src/App.lumin",

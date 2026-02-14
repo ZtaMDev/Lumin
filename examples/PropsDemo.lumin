@@ -3,7 +3,7 @@ import MyCard from "./MyCard.lumin"
 ---
 
 <script>
-  import { signal } from "luminjs";
+  import { signal } from "lumin-js";
   const count = signal(0);
   const inc = () => count(count() + 1);
   const dec = () => count(count() - 1);

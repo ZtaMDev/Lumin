@@ -6,7 +6,7 @@ import StyledCounter from "./StyledCounter.lumin"
 ---
 
 <script>
-  import { signal } from "luminjs";
+  import { signal } from "lumin-js";
   const showExtra = signal(false);
   const toggle = () => showExtra(!showExtra());
 </script>
