@@ -30,7 +30,7 @@ npm install -g lumix-js
 To create a new project, use the `init` command:
 
 ```bash
-lumix init my-new-project
+npm create lumix@latest my-new-project
 cd my-new-project
 npm install
 npm run dev
