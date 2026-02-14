@@ -1,3 +1,6 @@
+---
+import Sec from "./Sec.lumin"
+---
 <script>
   import { signal } from "luminjs";
   const message = signal("Hello LuminJS!");

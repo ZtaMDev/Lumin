@@ -5,6 +5,7 @@ const VALID_KEYS = new Set([
     "rootId",
     "vite",
     "srcDir",
+    "checkTypes",
 ]);
 /**
  * Helper function to provide types for the LuminJS config.

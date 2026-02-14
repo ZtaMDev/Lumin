@@ -27,6 +27,11 @@ export interface LuminConfig {
      * Source directory. Defaults to the root of the project.
      */
     srcDir?: string;
+    /**
+     * Enable or disable semantic type checking during build/dev.
+     * Defaults to true in TS projects, can be disabled for JS projects.
+     */
+    checkTypes?: boolean;
     /** Allow extra keys without TS errors, but we'll warn at runtime */
     [key: string]: any;
 }

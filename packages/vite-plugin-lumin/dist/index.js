@@ -14,6 +14,7 @@ export default function lumin(config) {
                 const js = await compile({
                     input: id,
                     bundle: false,
+                    checkTypes: config?.checkTypes,
                 });
                 return {
                     code: js,

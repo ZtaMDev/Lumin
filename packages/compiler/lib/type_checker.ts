@@ -17,23 +17,52 @@ export function validateTypeScript(
   luminFile: string,
   originalSource: string,
 ): TypeDiagnostic[] {
-  const compilerOptions: ts.CompilerOptions = {
-    target: ts.ScriptTarget.ESNext,
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.NodeJs,
-    allowJs: true,
-    checkJs: false,
-    strict: true,
-    noEmit: true,
-    esModuleInterop: true,
-    skipLibCheck: true,
-    lib: ["lib.esnext.d.ts", "lib.dom.d.ts"],
-  };
+  // 1. Try to find local tsconfig.json
+  const configPath = ts.findConfigFile(
+    path.dirname(luminFile),
+    ts.sys.fileExists,
+    "tsconfig.json",
+  );
 
-  const normalize = (p: string) => p.replace(/\\/g, "/");
+  let compilerOptions: ts.CompilerOptions;
+  let rootNames: string[] = [];
+
+  if (configPath) {
+    const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+    const parsedConfig = ts.parseJsonConfigFileContent(
+      configFile.config,
+      ts.sys,
+      path.dirname(configPath),
+    );
+    compilerOptions = {
+      ...parsedConfig.options,
+      noEmit: true, // Force noEmit for validation
+      checkJs: false, // Ensure we don't double-check JS if not wanted
+      allowJs: true,
+      skipLibCheck: true,
+    };
+    rootNames = parsedConfig.fileNames;
+  } else {
+    // Fallback defaults
+    compilerOptions = {
+      target: ts.ScriptTarget.ESNext,
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.NodeJs,
+      allowJs: true,
+      checkJs: false,
+      strict: true,
+      noEmit: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      lib: ["lib.esnext.d.ts", "lib.dom.d.ts"],
+    };
+  }
+
+  // Normalize a path for comparison (lower-case drive letter, forward slashes)
+  const normalize = (p: string) => p.replace(/\\/g, "/").toLowerCase();
   const virtualFileName = normalize(path.resolve(luminFile) + ".ts");
 
-  // Create a minimal compiler host
+  // Create a compiler host that includes the virtual file
   const host = ts.createCompilerHost(compilerOptions);
 
   const originalGetSourceFile = host.getSourceFile;
@@ -57,9 +86,27 @@ export function validateTypeScript(
     return originalFileExists(fileName);
   };
 
-  const program = ts.createProgram([virtualFileName], compilerOptions, host);
-  const semanticDiagnostics = program.getSemanticDiagnostics();
-  const syntacticDiagnostics = program.getSyntacticDiagnostics();
+  // Include the virtual file in the root names
+  const program = ts.createProgram(
+    [...rootNames, virtualFileName],
+    compilerOptions,
+    host,
+  );
+
+  // Robustly retrieve the source file using the exact normalized match logic
+  const sourceFile =
+    program.getSourceFile(virtualFileName) ||
+    program
+      .getSourceFiles()
+      .find((f) => normalize(f.fileName) === virtualFileName);
+
+  if (!sourceFile) {
+    // Should not happen, but prevents crash
+    return [];
+  }
+
+  const semanticDiagnostics = program.getSemanticDiagnostics(sourceFile);
+  const syntacticDiagnostics = program.getSyntacticDiagnostics(sourceFile);
 
   const allDiagnostics = [...syntacticDiagnostics, ...semanticDiagnostics];
 
