@@ -4,6 +4,12 @@
   "description": "The high-performance LuminJS compiler",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/",
+    "bin/",
+    "lib/"
+  ],
   "bin": {
     "luminc": "bin/luminc.js"
   },

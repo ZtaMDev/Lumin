@@ -64,4 +64,5 @@ pub enum AttributeNode {
     Static { name: String, value: String },
     Dynamic { name: String, expr: JsExpr },
     EventHandler { name: String, expr: JsExpr },
+    Bind { property: String, expr: JsExpr },
 }

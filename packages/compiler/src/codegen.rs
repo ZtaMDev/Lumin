@@ -89,7 +89,7 @@ fn generate_component_body(component: &ComponentFile, is_esm: bool, script_body:
     if let Some(style) = &component.style {
         out.push_str("  // Styles\n");
         out.push_str("  if (typeof document !== 'undefined') {\n");
-        out.push_str("    const styleId = 'lumin-styles';\n");
+        out.push_str(&format!("    const styleId = 'lumin-style-{}';\n", fn_name.to_lowercase()));
         out.push_str("    if (!document.getElementById(styleId)) {\n");
         out.push_str("      const s = document.createElement('style');\n");
         out.push_str("      s.id = styleId;\n");
@@ -170,6 +170,10 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool) -> Strin
                         }
                         AttributeNode::EventHandler { name, expr } => {
                             s.push_str(&format!("'{}': {}", name, expr.code.trim()));
+                        }
+                        AttributeNode::Bind { property, expr } => {
+                            // Emit bind:property with the signal reference (not wrapped in a closure)
+                            s.push_str(&format!("'bind:{}': {}", property, expr.code.trim()));
                         }
                     }
                     if i < el.attributes.len() - 1 {

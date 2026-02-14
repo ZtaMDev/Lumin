@@ -137,6 +137,17 @@ pub(crate) fn lib_collect_expr_diagnostics(
                             }
                         }
                         ast::AttributeNode::Static { .. } => {}
+                        ast::AttributeNode::Bind { expr, .. } => {
+                            if let Some(span) = expr.span.as_ref() {
+                                out.extend(validate_js_snippet(
+                                    source,
+                                    line_starts,
+                                    &expr.code,
+                                    span.start,
+                                    JsSnippetKind::Expression,
+                                ));
+                            }
+                        }
                     }
                 }
 

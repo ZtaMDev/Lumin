@@ -478,7 +478,10 @@ impl<'a> MarkupParser<'a> {
                 }
                 if self.starts_with("{") {
                     let expr = self.parse_braced_js_expr()?;
-                    if name.starts_with("on") {
+                    if name.starts_with("bind:") {
+                        let property = name[5..].to_string();
+                        attrs.push(AttributeNode::Bind { property, expr });
+                    } else if name.starts_with("on") {
                         attrs.push(AttributeNode::EventHandler { name, expr });
                     } else {
                         attrs.push(AttributeNode::Dynamic { name, expr });

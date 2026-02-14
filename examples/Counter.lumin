@@ -1,17 +1,18 @@
 <script>
-const count = signal(0)
+  import { signal } from "@luminjs/runtime";
+  const count = signal(0)
 
-function inc() {
-  count(count() + 1)
-}
-function dec() {
-  count(count() - 1)
-}
+  function inc() {
+    count(count() + 1)
+  }
+  function dec() {
+    count(count() - 1)
+  }
 </script>
 
 <div>
   <h1>Count: {count()}</h1>
   <button onClick={inc}>Increment</button>
-  <button onClick={() => { count(count() - 1) }}>Decrement</button>
+  <button onClick={dec}>Decrement</button>
   <button onClick={() => { console.log("Logging to console") }}>Log</button>
 </div>
