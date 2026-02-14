@@ -1,0 +1,45 @@
+---
+import MyLayout from "./MyLayout.lumin"
+import ControlFlowDemo from "./ControlFlowDemo.lumin"
+---
+
+<script>
+  import { signal } from "@luminjs/runtime";
+  const showExtra = signal(false);
+  const toggle = () => showExtra(!showExtra());
+</script>
+
+<div class="demo">
+  <h1>Slots & Layouts Demo</h1>
+  
+  <MyLayout>
+    <div slot="header">
+      <h2 style="color: blue;">Custom Header</h2>
+    </div>
+    <p>This is the <strong>default slot</strong> content.</p>
+    <p>It can contain multiple nodes.</p>
+    
+    @{if (showExtra()) {
+      <p style="color: green;">Extra reactive content inside default slot!</p>
+    }}
+  </MyLayout>
+
+  <MyLayout>
+    <p>This card uses the <em>Default Header</em> fallback.</p>
+    <button onClick={toggle}>Toggle Extra Content</button>
+  </MyLayout>
+
+  <ControlFlowDemo />
+</div>
+
+<style>
+  .demo {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  button {
+    padding: 8px 16px;
+    cursor: pointer;
+  }
+</style>

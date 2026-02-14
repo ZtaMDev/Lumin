@@ -31,6 +31,8 @@ fn collect_used_component_tags(nodes: &[crate::ast::TemplateNode], out: &mut Has
                 out.insert(el.tag_name.clone());
             }
             collect_used_component_tags(&el.children, out);
+        } else if let crate::ast::TemplateNode::Slot(slot) = n {
+            collect_used_component_tags(&slot.fallback, out);
         }
     }
 }
@@ -193,10 +195,98 @@ impl GraphCompiler {
             }
         }
 
+        self.validate_slots_in_nodes(&component.template, &import_map, &source, &line_starts);
+
         self.component_names_by_path.insert(path.clone(), name);
         self.components_by_path.insert(path.clone(), component);
         self.visiting.remove(&path);
         Ok(())
+    }
+
+    fn validate_slots_in_nodes(
+        &mut self,
+        nodes: &[crate::ast::TemplateNode],
+        import_map: &HashMap<String, PathBuf>,
+        source: &str,
+        line_starts: &[usize],
+    ) {
+        for n in nodes {
+            match n {
+                crate::ast::TemplateNode::Element(el) => {
+                    let is_component = el
+                        .tag_name
+                        .chars()
+                        .next()
+                        .map(|c| c.is_ascii_uppercase())
+                        .unwrap_or(false);
+
+                    if is_component {
+                        let mut used_slots = HashSet::new();
+                        if let Some(child_path) = import_map.get(&el.tag_name) {
+                            if let Some(child_comp) = self.components_by_path.get(child_path) {
+                                for child in &el.children {
+                                    if let crate::ast::TemplateNode::Element(child_el) = child {
+                                        for attr in &child_el.attributes {
+                                            if let crate::ast::AttributeNode::Static { name, value } = attr {
+                                                if name == "slot" {
+                                                    // Duplicate check
+                                                    if used_slots.contains(value) {
+                                                        let span = child_el.tag_span.clone().unwrap_or(crate::ast::SourceRange { start: 0, end: 0 });
+                                                        let (lc_start, lc_end) = crate::diagnostic::range_to_line_cols(line_starts, span.start, span.end);
+                                                        self.diagnostics.push(Diagnostic {
+                                                            severity: crate::diagnostic::DiagnosticSeverity::Warning,
+                                                            message: format!("Duplicate slot '{}' in component '{}'", value, el.tag_name),
+                                                            range: to_diag_range(span),
+                                                            start: lc_start,
+                                                            end: lc_end,
+                                                        });
+                                                    }
+                                                    used_slots.insert(value.clone());
+
+                                                    // Existence check
+                                                    if !child_comp.defined_slots.contains(value) {
+                                                        let span = child_el.tag_span.clone().unwrap_or(crate::ast::SourceRange { start: 0, end: 0 });
+                                                        let (lc_start, lc_end) = crate::diagnostic::range_to_line_cols(line_starts, span.start, span.end);
+                                                        self.diagnostics.push(Diagnostic {
+                                                            severity: crate::diagnostic::DiagnosticSeverity::Warning,
+                                                            message: format!("Component '{}' does not define a slot named '{}'", el.tag_name, value),
+                                                            range: to_diag_range(span),
+                                                            start: lc_start,
+                                                            end: lc_end,
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    self.validate_slots_in_nodes(&el.children, import_map, source, line_starts);
+                }
+                crate::ast::TemplateNode::ControlFlow(cf) => match cf {
+                    crate::ast::ControlFlowBlock::If {
+                        then_branch,
+                        else_ifs,
+                        else_branch,
+                        ..
+                    } => {
+                        self.validate_slots_in_nodes(then_branch, import_map, source, line_starts);
+                        for (_, branch) in else_ifs {
+                            self.validate_slots_in_nodes(branch, import_map, source, line_starts);
+                        }
+                        if let Some(branch) = else_branch {
+                            self.validate_slots_in_nodes(branch, import_map, source, line_starts);
+                        }
+                    }
+                    crate::ast::ControlFlowBlock::For { body, .. } => {
+                        self.validate_slots_in_nodes(body, import_map, source, line_starts);
+                    }
+                },
+                _ => {}
+            }
+        }
     }
 
     fn emit_bundle(&self, entry_path: &Path) -> Result<String, anyhow::Error> {
@@ -254,3 +344,10 @@ impl GraphCompiler {
     }
 }
 
+
+fn to_diag_range(r: crate::ast::SourceRange) -> crate::diagnostic::SourceRange {
+    crate::diagnostic::SourceRange {
+        start: r.start,
+        end: r.end,
+    }
+}

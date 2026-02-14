@@ -17,6 +17,7 @@ pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
         script: None,
         style: None,
         template: Vec::new(),
+        defined_slots: Vec::new(),
     };
 
     parser.skip_ws();
@@ -126,7 +127,46 @@ pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
         component.template.extend(nodes);
     }
 
+    component.defined_slots = collect_slots(&component.template);
+
     Ok(component)
+}
+
+fn collect_slots(nodes: &[TemplateNode]) -> Vec<String> {
+    let mut slots = Vec::new();
+    for n in nodes {
+        match n {
+            TemplateNode::Slot(s) => {
+                slots.push(s.name.as_deref().unwrap_or("children").to_string());
+                // Fallback can also have slots (unusual but possible)
+                slots.extend(collect_slots(&s.fallback));
+            }
+            TemplateNode::Element(el) => {
+                slots.extend(collect_slots(&el.children));
+            }
+            TemplateNode::ControlFlow(cf) => match cf {
+                ControlFlowBlock::If {
+                    then_branch,
+                    else_ifs,
+                    else_branch,
+                    ..
+                } => {
+                    slots.extend(collect_slots(then_branch));
+                    for (_, branch) in else_ifs {
+                        slots.extend(collect_slots(branch));
+                    }
+                    if let Some(branch) = else_branch {
+                        slots.extend(collect_slots(branch));
+                    }
+                }
+                ControlFlowBlock::For { body, .. } => {
+                    slots.extend(collect_slots(body));
+                }
+            },
+            _ => {}
+        }
+    }
+    slots
 }
 
 fn parse_imports_block(block: &str) -> Result<Vec<ComponentImport>, CompileError> {
@@ -427,6 +467,12 @@ impl<'a> MarkupParser<'a> {
                 continue;
             }
 
+            if self.starts_with("{@slot") {
+                let slot = self.parse_slot_node()?;
+                nodes.push(TemplateNode::Slot(slot));
+                continue;
+            }
+
             if self.starts_with("{") {
                 let expr = self.parse_braced_js_expr()?;
                 nodes.push(TemplateNode::Expr(expr));
@@ -563,6 +609,31 @@ impl<'a> MarkupParser<'a> {
                 }),
             })
         }
+    }
+
+    fn parse_slot_node(&mut self) -> Result<SlotNode, CompileError> {
+        self.expect("{@slot")?;
+        self.skip_ws();
+
+        let mut name = None;
+        if !self.starts_with("??") && !self.starts_with("}") {
+            name = Some(self.parse_tag_name()?);
+            self.skip_ws();
+        }
+
+        let mut fallback = Vec::new();
+        if self.starts_with("??") {
+            self.pos += 2;
+            self.skip_ws();
+            // Terminate at '}'
+            fallback = self.parse_nodes(None, Some("}"))?;
+        }
+
+        self.expect("}")?;
+        Ok(SlotNode {
+            name,
+            fallback,
+        })
     }
 
     fn parse_control_flow_branch(&mut self) -> Result<Vec<TemplateNode>, CompileError> {

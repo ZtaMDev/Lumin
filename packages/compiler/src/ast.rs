@@ -4,6 +4,7 @@ pub struct ComponentFile {
     pub script: Option<ScriptBlock>,
     pub style: Option<StyleBlock>,
     pub template: Vec<TemplateNode>,
+    pub defined_slots: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -62,6 +63,13 @@ pub enum TemplateNode {
     Text(String),
     Expr(JsExpr),
     ControlFlow(ControlFlowBlock),
+    Slot(SlotNode),
+}
+
+#[derive(Debug, Clone)]
+pub struct SlotNode {
+    pub name: Option<String>,
+    pub fallback: Vec<TemplateNode>,
 }
 
 #[derive(Debug, Clone)]

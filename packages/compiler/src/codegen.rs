@@ -1,4 +1,5 @@
 use crate::ast::*;
+use std::collections::HashMap;
 
 pub fn generate_js(component: &ComponentFile, component_name: &str) -> String {
     generate_component_js_esm(component, component_name)
@@ -119,12 +120,12 @@ fn generate_component_body(component: &ComponentFile, is_esm: bool, script_body:
 
     out.push_str("  return ");
     if component.template.len() == 1 {
-        out.push_str(&generate_node_h(&component.template[0], 2, !is_esm));
+        out.push_str(&generate_node_h(&component.template[0], 2, !is_esm, false));
     } else {
         out.push_str("__LUMIN__.h('div', null, [\n");
         for (i, node) in component.template.iter().enumerate() {
             out.push_str("    ");
-            out.push_str(&generate_node_h(node, 4, !is_esm));
+            out.push_str(&generate_node_h(node, 4, !is_esm, false));
             if i < component.template.len() - 1 {
                 out.push(',');
             }
@@ -143,7 +144,7 @@ fn generate_component_body(component: &ComponentFile, is_esm: bool, script_body:
     out
 }
 
-fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool) -> String {
+fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool, strip_slot_attr: bool) -> String {
     let mut s = String::new();
     match node {
         TemplateNode::Text(t) => {
@@ -151,6 +152,30 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool) -> Strin
         }
         TemplateNode::Expr(expr) => {
             s.push_str(&format!("() => ({})", expr.code));
+        }
+        TemplateNode::Slot(slot) => {
+            let is_default = slot.name.is_none();
+            let mut fallback_js = String::from("[]");
+            if !slot.fallback.is_empty() {
+                let mut fallback_s = String::from("[\n");
+                for (i, node) in slot.fallback.iter().enumerate() {
+                    fallback_s.push_str(&" ".repeat(indent + 2));
+                    fallback_s.push_str(&generate_node_h(node, indent + 2, is_bundle, false));
+                    if i < slot.fallback.len() - 1 {
+                        fallback_s.push(',');
+                    }
+                    fallback_s.push('\n');
+                }
+                fallback_s.push_str(&format!("{}]", " ".repeat(indent)));
+                fallback_js = fallback_s;
+            }
+            
+            if is_default {
+                s.push_str(&format!("(props.children ? props.children() : {})", fallback_js));
+            } else {
+                let name = slot.name.as_ref().unwrap();
+                s.push_str(&format!("(props.slots?.{} ? props.slots.{}() : {})", name, name, fallback_js));
+            }
         }
         TemplateNode::ControlFlow(cf) => {
             match cf {
@@ -169,7 +194,7 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool) -> Strin
                     s.push_str("{ body: () => [\n");
                     for child in then_branch {
                         s.push_str(&" ".repeat(indent + 4));
-                        s.push_str(&generate_node_h(child, indent + 4, is_bundle));
+                        s.push_str(&generate_node_h(child, indent + 4, is_bundle, false));
                         s.push_str(",\n");
                     }
                     s.push_str(&" ".repeat(indent + 2));
@@ -183,7 +208,7 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool) -> Strin
                         s.push_str("), body: () => [\n");
                         for child in branch {
                             s.push_str(&" ".repeat(indent + 4));
-                            s.push_str(&generate_node_h(child, indent + 4, is_bundle));
+                            s.push_str(&generate_node_h(child, indent + 4, is_bundle, false));
                             s.push_str(",\n");
                         }
                         s.push_str(&" ".repeat(indent + 2));
@@ -196,7 +221,7 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool) -> Strin
                         s.push_str("{ body: () => [\n");
                         for child in branch {
                             s.push_str(&" ".repeat(indent + 4));
-                            s.push_str(&generate_node_h(child, indent + 4, is_bundle));
+                            s.push_str(&generate_node_h(child, indent + 4, is_bundle, false));
                             s.push_str(",\n");
                         }
                         s.push_str(&" ".repeat(indent + 2));
@@ -221,7 +246,7 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool) -> Strin
                         s.push_str(&format!("__LUMIN__.__for(() => ({}), {} => [\n", list_part, item_part));
                         for child in body {
                             s.push_str(&" ".repeat(indent + 2));
-                            s.push_str(&generate_node_h(child, indent + 2, is_bundle));
+                            s.push_str(&generate_node_h(child, indent + 2, is_bundle, false));
                             s.push_str(",\n");
                         }
                         s.push_str(&" ".repeat(indent));
@@ -257,8 +282,33 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool) -> Strin
 
             s.push_str(&format!("__LUMIN__.h({}, ", tag));
 
-            // Attributes
-            if el.attributes.is_empty() {
+            let mut slots: HashMap<String, Vec<&TemplateNode>> = HashMap::new();
+            let mut default_children: Vec<&TemplateNode> = Vec::new();
+
+            if is_component {
+                for child in &el.children {
+                    let mut assigned_slot = None;
+                    if let TemplateNode::Element(child_el) = child {
+                        for attr in &child_el.attributes {
+                            if let AttributeNode::Static { name, value } = attr {
+                                if name == "slot" {
+                                    assigned_slot = Some(value.clone());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if let Some(name) = assigned_slot {
+                        slots.entry(name).or_default().push(child);
+                    } else {
+                        default_children.push(child);
+                    }
+                }
+            }
+
+            // Attributes and Slots
+            if el.attributes.is_empty() && slots.is_empty() && default_children.is_empty() {
                 s.push_str("null");
             } else {
                 s.push_str("{\n");
@@ -266,6 +316,9 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool) -> Strin
                     s.push_str(&" ".repeat(indent + 2));
                     match attr {
                         AttributeNode::Static { name, value } => {
+                            if strip_slot_attr && name == "slot" {
+                                continue;
+                            }
                             s.push_str(&format!("'{}': '{}'", name, escape_backticks(value)));
                         }
                         AttributeNode::Dynamic { name, expr } => {
@@ -275,24 +328,75 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool) -> Strin
                             s.push_str(&format!("'{}': {}", name, expr.code.trim()));
                         }
                         AttributeNode::Bind { property, expr } => {
-                            // Emit bind:property with the signal reference (not wrapped in a closure)
                             s.push_str(&format!("'bind:{}': {}", property, expr.code.trim()));
                         }
                     }
-                    if i < el.attributes.len() - 1 {
+                    if i < el.attributes.len() - 1 || !slots.is_empty() || !default_children.is_empty() {
                         s.push(',');
                     }
                     s.push('\n');
                 }
+
+                if is_component {
+                    // Default slot (children)
+                    if !default_children.is_empty() {
+                        s.push_str(&" ".repeat(indent + 2));
+                        s.push_str("'children': () => [\n");
+                        for (i, child) in default_children.iter().enumerate() {
+                            s.push_str(&" ".repeat(indent + 4));
+                            s.push_str(&generate_node_h(child, indent + 4, is_bundle, true));
+                            if i < default_children.len() - 1 {
+                                s.push(',');
+                            }
+                            s.push('\n');
+                        }
+                        s.push_str(&" ".repeat(indent + 2));
+                        s.push_str("]");
+                        if !slots.is_empty() {
+                            s.push(',');
+                        }
+                        s.push('\n');
+                    }
+
+                    // Named slots
+                    if !slots.is_empty() {
+                        s.push_str(&" ".repeat(indent + 2));
+                        s.push_str("'slots': {\n");
+                        let mut slot_keys: Vec<_> = slots.keys().collect();
+                        slot_keys.sort();
+                        for (sk_idx, name) in slot_keys.iter().enumerate() {
+                            let children = &slots[*name];
+                            s.push_str(&" ".repeat(indent + 4));
+                            s.push_str(&format!("'{}': () => [\n", name));
+                            for (i, child) in children.iter().enumerate() {
+                                s.push_str(&" ".repeat(indent + 6));
+                                s.push_str(&generate_node_h(child, indent + 6, is_bundle, true));
+                                if i < children.len() - 1 {
+                                    s.push(',');
+                                }
+                                s.push('\n');
+                            }
+                            s.push_str(&" ".repeat(indent + 4));
+                            s.push_str("]");
+                            if sk_idx < slot_keys.len() - 1 {
+                                s.push(',');
+                            }
+                            s.push('\n');
+                        }
+                        s.push_str(&" ".repeat(indent + 2));
+                        s.push_str("}\n");
+                    }
+                }
+
                 s.push_str(&format!("{}}}", " ".repeat(indent)));
             }
 
-            // Children
-            if !el.children.is_empty() {
+            // For non-components, children still go as the third argument
+            if !is_component && !el.children.is_empty() {
                 s.push_str(", [\n");
                 for (i, child) in el.children.iter().enumerate() {
                     s.push_str(&" ".repeat(indent + 2));
-                    s.push_str(&generate_node_h(child, indent + 2, is_bundle));
+                    s.push_str(&generate_node_h(child, indent + 2, is_bundle, false));
                     if i < el.children.len() - 1 {
                         s.push(',');
                     }

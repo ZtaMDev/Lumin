@@ -190,6 +190,9 @@ pub(crate) fn lib_collect_expr_diagnostics(
                     lib_collect_expr_diagnostics(source, line_starts, body, out);
                 }
             },
+            ast::TemplateNode::Slot(slot) => {
+                lib_collect_expr_diagnostics(source, line_starts, &slot.fallback, out);
+            }
         }
     }
 }
@@ -261,6 +264,8 @@ fn validate_component_tags_imported_in_nodes(
             }
 
             validate_component_tags_imported_in_nodes(line_starts, imported, &el.children, out);
+        } else if let ast::TemplateNode::Slot(slot) = n {
+            validate_component_tags_imported_in_nodes(line_starts, imported, &slot.fallback, out);
         }
     }
 }
