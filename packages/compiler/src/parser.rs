@@ -180,9 +180,9 @@ fn parse_imports_block(block: &str) -> Result<Vec<ComponentImport>, CompileError
             .trim_matches(|c| c == '"' || c == '\'')
             .to_string();
 
-        if !source.ends_with(".lumin") {
+        if !source.ends_with(".lumix") {
             return Err(CompileError::InvalidStructure {
-                message: format!("only .lumin component imports are allowed in the --- block: {source}"),
+                message: format!("only .lumix component imports are allowed in the --- block: {source}"),
                 range: None,
             });
         }

@@ -1,0 +1,36 @@
+{
+  "name": "vite-plugin-lumix",
+  "version": "0.1.0",
+  "description": "Vite plugin for LuminJS",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "lumixjs",
+    "vite",
+    "plugin"
+  ],
+  "author": "LuminJS Team",
+  "license": "MIT",
+  "peerDependencies": {
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "@lumix-js/compiler": "workspace:*",
+    "lumix-js": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.9",
+    "@types/node": "^25.2.3",
+    "typescript": "^5.0.0",
+    "vite": "^7.3.1"
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "name": "@lumin-js/compiler",
+  "name": "@lumix-js/compiler",
   "version": "0.1.0",
   "description": "The high-performance LuminJS compiler",
   "type": "module",

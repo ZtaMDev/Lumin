@@ -1,5 +1,5 @@
 import { build as viteBuild } from "vite";
-import lumin from "vite-plugin-lumin";
+import lumix from "../../../vite-plugin-lumix/dist/index.js";
 import pc from "picocolors";
 import { loadConfig } from "./loader.js";
 import path from "path";
@@ -9,7 +9,7 @@ export async function build() {
     const cwd = process.cwd();
     const config = await loadConfig(cwd);
     console.log("");
-    console.log(`  ${pc.bold(pc.cyan("⚡ LuminJS"))} ${pc.dim("v0.1.0")}`);
+    console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim("v0.1.0")}`);
     console.log(pc.dim("  Building for production...\n"));
     const indexPath = path.join(cwd, "index.html");
     const hasIndex = fs.existsSync(indexPath);
@@ -39,7 +39,7 @@ export async function build() {
         await viteBuild({
             root: cwd,
             base: "/",
-            plugins: [lumin(config), ...(config.vite?.plugins || [])],
+            plugins: [lumix(config), ...(config.vite?.plugins || [])],
             build: {
                 outDir: "dist",
                 emptyOutDir: true,
@@ -47,7 +47,7 @@ export async function build() {
             },
             resolve: {
                 alias: {
-                    luminjs: path.resolve(__dirname, "../index.js"),
+                    "lumix-js": path.resolve(__dirname, "../index.js"),
                     ...config.vite?.resolve?.alias,
                 },
             },

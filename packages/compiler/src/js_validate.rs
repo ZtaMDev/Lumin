@@ -38,7 +38,7 @@ pub fn diagnose_forbidden_lumin_imports_in_module(
     for item in module.body {
         if let ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl)) = item {
             let src = import_decl.src.value.to_string();
-            if src.ends_with(".lumin") {
+            if src.ends_with(".lumix") {
                 let span: Span = import_decl.src.span;
                 let start = (span.lo.0 - fm.start_pos.0) as usize;
                 let end = (span.hi.0 - fm.start_pos.0) as usize;
@@ -48,7 +48,7 @@ pub fn diagnose_forbidden_lumin_imports_in_module(
 
                 diags.push(Diagnostic {
                     severity: DiagnosticSeverity::Error,
-                    message: "Component imports (.lumin) are not allowed inside <script>. Use the --- imports block instead.".into(),
+                    message: "Component imports (.lumix) are not allowed inside <script>. Use the --- imports block instead.".into(),
                     range: SourceRange {
                         start: abs_start,
                         end: abs_end,

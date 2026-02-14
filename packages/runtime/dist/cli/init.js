@@ -5,7 +5,7 @@ import path from "path";
 import { __dirname } from "./utils.js";
 export async function init() {
     console.log("");
-    console.log(`  ${pc.bold(pc.cyan("⚡ LuminJS"))} ${pc.dim("v0.1.0")}`);
+    console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim("v0.1.0")}`);
     console.log(pc.dim("  Scaffolding a new project...\n"));
     const response = await prompts([
         {

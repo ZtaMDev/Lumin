@@ -1,0 +1,50 @@
+---
+import MyCard from "./MyCard.lumix"
+---
+
+<script>
+  import { signal } from "lumix-js";
+  const count = signal(0);
+  const inc = () => count(count() + 1);
+  const dec = () => count(count() - 1);
+</script>
+
+<div class="container">
+  <h1>Component Props Demo</h1>
+  <p>Parent Counter: <strong>{count()}</strong></p>
+  
+  <div class="controls">
+    <button onClick={inc}>Parent +</button>
+    <button onClick={dec}>Parent -</button>
+  </div>
+
+  <hr />
+
+  <MyCard title="Reactive Card (Props)" count={count()} active={true} />
+  
+  <MyCard title="Static Card (Default Actives value)" count={100} />
+
+  <p class="note">Note: If you omit 'title' or 'count', an error will be thrown (see console).</p>
+</div>
+
+<style>
+  .container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  .controls {
+    margin: 10px 0;
+  }
+  button {
+    padding: 8px 16px;
+    margin-right: 10px;
+    cursor: pointer;
+  }
+  .note {
+    font-size: 0.9em;
+    color: #666;
+    font-style: italic;
+    margin-top: 20px;
+  }
+</style>

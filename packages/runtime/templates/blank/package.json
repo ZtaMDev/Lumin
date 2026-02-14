@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "lumin dev",
-    "build": "lumin build",
-    "preview": "lumin preview"
+    "dev": "lumix dev",
+    "build": "lumix build",
+    "preview": "lumix preview"
   },
   "dependencies": {
-    "lumin-js": "latest"
+    "lumix-js": "latest"
   },
   "sideEffects": false
 }

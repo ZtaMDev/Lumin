@@ -12,5 +12,5 @@
     "noEmit": true,
     "jsx": "preserve"
   },
-  "include": ["main.ts", "src/**/*", "lumin-env.d.ts"]
+  "include": ["main.ts", "src/**/*", "lumix-env.d.ts"]
 }

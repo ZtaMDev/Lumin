@@ -1,5 +1,5 @@
 import { preview as vitePreview } from "vite";
-import lumin from "vite-plugin-lumin";
+import lumin from "../../../vite-plugin-lumix/dist/index.js";
 import pc from "picocolors";
 import { loadConfig } from "./loader.js";
 import path from "path";
@@ -8,7 +8,7 @@ export async function preview() {
     const cwd = process.cwd();
     const config = await loadConfig(cwd);
     console.log("");
-    console.log(`  ${pc.bold(pc.cyan("⚡ LuminJS"))} ${pc.dim("v0.1.0")}`);
+    console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim("v0.1.0")}`);
     console.log(pc.dim("  Previewing production build...\n"));
     try {
         const server = await vitePreview({
@@ -21,7 +21,7 @@ export async function preview() {
             },
             resolve: {
                 alias: {
-                    luminjs: path.resolve(__dirname, "../index.js"),
+                    "lumix-js": path.resolve(__dirname, "../index.js"),
                     ...config.vite?.resolve?.alias,
                 },
             },

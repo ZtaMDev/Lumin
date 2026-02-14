@@ -16,24 +16,24 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            artifact: luminjs-linux-x64
-            binary: luminjs
+            artifact: lumixjs-linux-x64
+            binary: lumixjs
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
-            artifact: luminjs-linux-arm64
-            binary: luminjs
+            artifact: lumixjs-linux-arm64
+            binary: lumixjs
           - target: x86_64-apple-darwin
             os: macos-14
-            artifact: luminjs-darwin-x64
-            binary: luminjs
+            artifact: lumixjs-darwin-x64
+            binary: lumixjs
           - target: aarch64-apple-darwin
             os: macos-14
-            artifact: luminjs-darwin-arm64
-            binary: luminjs
+            artifact: lumixjs-darwin-arm64
+            binary: lumixjs
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            artifact: luminjs-win32-x64
-            binary: luminjs.exe
+            artifact: lumixjs-win32-x64
+            binary: lumixjs.exe
 
     runs-on: ${{ matrix.os }}
 

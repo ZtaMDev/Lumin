@@ -1,0 +1,28 @@
+<script>
+  import { signal } from "lumix-js";
+  const message = signal("Hello LumixJS!");
+</script>
+
+<div class="container">
+  <h1>{message()}</h1>
+  <p>Edit <code>src/App.lumix</code> to get started.</p>
+</div>
+
+<style>
+  .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  h1 {
+    color: #4f46e5;
+  }
+  code {
+    background: #f3f4f6;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+  }
+</style>

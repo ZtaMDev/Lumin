@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use luminjs::diagnostic::DiagnosticSeverity;
-use luminjs::error::CompileError;
+use lumixjs::diagnostic::DiagnosticSeverity;
+use lumixjs::error::CompileError;
 use owo_colors::OwoColorize;
 
-/// LuminJS compiler CLI
+/// lumixjs compiler CLI
 #[derive(Parser, Debug)]
-#[command(name = "luminc", version, about = "LuminJS compiler", long_about = None)]
+#[command(name = "luminc", version, about = "lumixjs compiler", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -72,9 +72,9 @@ fn main() {
                 Ok(js) => {
                 if matches!(format, OutputFormat::Json) {
                     let source = std::fs::read_to_string(&input).unwrap_or_default();
-                    let component = luminjs::parser::parse_component(&source).unwrap();
+                    let component = lumixjs::parser::parse_component(&source).unwrap();
                     let component_name = input.file_stem().and_then(|s| s.to_str()).unwrap_or("Component");
-                    let ts = luminjs::ts_codegen::generate_ts(&component, component_name);
+                    let ts = lumixjs::ts_codegen::generate_ts(&component, component_name);
 
                     let payload = serde_json::json!({
                         "file": input.display().to_string(),
@@ -107,9 +107,9 @@ fn main() {
                                 if let Some(r) = range {
                                     if let Ok(source) = std::fs::read_to_string(&input) {
                                         let starts =
-                                            luminjs::diagnostic::compute_line_starts(&source);
+                                            lumixjs::diagnostic::compute_line_starts(&source);
                                         let (start_lc, end_lc) =
-                                            luminjs::diagnostic::range_to_line_cols(
+                                            lumixjs::diagnostic::range_to_line_cols(
                                                 &starts, r.start, r.end,
                                             );
 
@@ -147,19 +147,19 @@ fn run_build(
     no_html: bool,
 ) -> anyhow::Result<String> {
     let (js, diags) = if bundle {
-        let res = luminjs::bundler::bundle_entry(&input)?;
+        let res = lumixjs::bundler::bundle_entry(&input)?;
         (res.js, res.diagnostics)
     } else {
-        luminjs::compile_file_with_diagnostics(&input)?
+        lumixjs::compile_file_with_diagnostics(&input)?
     };
     if !diags.is_empty() {
         match format {
             OutputFormat::Json => {
                 let source = std::fs::read_to_string(&input).unwrap_or_default();
-                let component_res = luminjs::parser::parse_component(&source);
+                let component_res = lumixjs::parser::parse_component(&source);
                 let ts = if let Ok(component) = component_res {
                     let component_name = input.file_stem().and_then(|s| s.to_str()).unwrap_or("Component");
-                    luminjs::ts_codegen::generate_ts(&component, component_name)
+                    lumixjs::ts_codegen::generate_ts(&component, component_name)
                 } else {
                     String::new()
                 };
@@ -241,7 +241,7 @@ fn run_build(
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>LuminJS App</title>
+    <title>lumixjs App</title>
   </head>
   <body>
     <div id="app"></div>
@@ -261,7 +261,7 @@ fn run_build(
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>LuminJS App</title>
+    <title>lumixjs App</title>
   </head>
   <body>
     <div id="app"></div>

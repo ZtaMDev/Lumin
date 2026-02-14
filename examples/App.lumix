@@ -1,0 +1,9 @@
+---
+import { StyledCounter } from "./StyledCounter.lumix"
+import { FormDemo } from "./FormDemo.lumix"
+---
+
+<div>
+  <StyledCounter />
+  <FormDemo />
+</div>

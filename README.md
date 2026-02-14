@@ -1,10 +1,10 @@
-# LuminJS
+# LumixJS
 
-LuminJS is a high-performance web framework featuring a native compiler written in Rust. It is designed to combine the speed of compiled toolchains with a fine-grained reactive runtime, specifically optimized for Universal Rendering (SSG + SSR) with an Islands architecture.
+LumixJS is a high-performance web framework featuring a native compiler written in Rust. It is designed to combine the speed of compiled toolchains with a fine-grained reactive runtime, specifically optimized for Universal Rendering (SSG + SSR) with an Islands architecture.
 
 ## Vision and Objectives
 
-The goal of LuminJS is to provide an "Astro-like" experience where performance is the default.
+The goal of LumixJS is to provide an "Astro-like" experience where performance is the default.
 
 - **Islands Architecture**: Automatically ship zero JavaScript by default, hydrating only the reactive components (islands) necessary for interactivity.
 - **SSG & SSR First**: Built-in support for Static Site Generation and Server-Side Rendering.
@@ -19,10 +19,10 @@ The goal of LuminJS is to provide an "Astro-like" experience where performance i
 
 ## Installation
 
-The LuminJS CLI is the primary tool for creating and managing projects. Install it globally via npm:
+The LumixJS CLI is the primary tool for creating and managing projects.
 
 ```bash
-npm install -g lumin-js
+npm install -g lumix-js
 ```
 
 ## Getting Started
@@ -30,7 +30,7 @@ npm install -g lumin-js
 To create a new project, use the `init` command:
 
 ```bash
-lumin init my-new-project
+lumix init my-new-project
 cd my-new-project
 npm install
 npm run dev
@@ -40,11 +40,11 @@ npm run dev
 
 ### Reactive Counter
 
-LuminJS components use a `.lumin` extension. Logic and markup are co-located for a cohesive developer experience.
+LumixJS components use a `.lumix` extension. Logic and markup are co-located for a cohesive developer experience.
 
 ```svelte
 <script>
-  import { signal } from "lumin-js";
+  import { signal } from "lumix-js";
 
   const count = signal(0);
 
@@ -59,14 +59,14 @@ LuminJS components use a `.lumin` extension. Logic and markup are co-located for
 
 ### Control Flow
 
-LuminJS provides a robust syntax for conditional and iterative rendering using the `@{}` block.
+LumixJS provides a robust syntax for conditional and iterative rendering using the `@{}` block.
 
 ```svelte
 <script>
-  import { signal } from "lumin-js";
+  import { signal } from "lumix-js";
 
   const show = signal(true);
-  const items = signal(["Rust", "TypeScript", "LuminJS"]);
+  const items = signal(["Rust", "TypeScript", "LumixJS"]);
 
   const toggle = () => show(!show());
 </script>
@@ -88,11 +88,11 @@ LuminJS provides a robust syntax for conditional and iterative rendering using t
 
 ## Project Structure
 
-LuminJS is organized as a monorepo:
+LumixJS is organized as a monorepo:
 
-- **[compiler](packages/compiler)**: The Rust-powered core (`@lumin-js/compiler`) and Node.js validation bridge.
+- **[compiler](packages/compiler)**: The Rust-powered core (`@lumix-js/compiler`) and Node.js validation bridge.
 - **[runtime](packages/runtime)**: The reactive core, lifecycle hooks, and CLI.
-- **[vite-plugin-lumin](packages/vite-plugin-lumin)**: The official Vite integration.
+- **[vite-plugin-lumix](packages/vite-plugin-lumix)**: The official Vite integration.
 
 For more specialized information, refer to the README files within each package directory.
 

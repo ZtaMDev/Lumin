@@ -17,7 +17,7 @@ function getBinaryName(): string {
   const archKey = arch === "arm64" ? "arm64" : "x64";
   const ext = platform === "win32" ? ".exe" : "";
 
-  return `luminjs-${platform}-${archKey}${ext}`;
+  return `lumixjs-${platform}-${archKey}${ext}`;
 }
 
 function findBinary(): string | null {

@@ -1,9 +1,0 @@
----
-import { StyledCounter } from "./StyledCounter.lumin"
-import { FormDemo } from "./FormDemo.lumin"
----
-
-<div>
-  <StyledCounter />
-  <FormDemo />
-</div>

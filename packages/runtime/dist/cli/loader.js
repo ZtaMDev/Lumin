@@ -2,10 +2,10 @@ import { bundleRequire } from "bundle-require";
 import path from "path";
 import fs from "fs";
 const CONFIG_FILES = [
-    "lumin.config.mjs",
-    "lumin.config.js",
-    "lumin.config.ts",
-    "lumin.config.mts",
+    "lumix.config.mjs",
+    "lumix.config.js",
+    "lumix.config.ts",
+    "lumix.config.mts",
 ];
 /**
  * Find the config file path in the given directory.

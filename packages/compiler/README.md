@@ -1,10 +1,10 @@
-# @lumin-js/compiler
+# @lumix-js/compiler
 
-The LuminJS compiler is a high-performance, native toolchain built with Rust. It provides robust parsing, semantic TypeScript validation, and optimized code generation for LuminJS components.
+The LumixJS compiler is a high-performance, native toolchain built with Rust. It provides robust parsing, semantic TypeScript validation, and optimized code generation for LumixJS components.
 
 ## Technical Architecture
 
-The compiler consists of a Rust core (`luminc`) and a Node.js wrapper that provides a seamless integration with the JavaScript ecosystem.
+The compiler consists of a Rust core (`lumixjs`) and a Node.js wrapper that provides a seamless integration with the JavaScript ecosystem.
 
 ### Pipeline
 
@@ -18,14 +18,14 @@ The compiler consists of a Rust core (`luminc`) and a Node.js wrapper that provi
 
 ## CLI Usage
 
-The compiler includes the `luminjs-{platform}-{arch}` binary for direct use in build pipelines.
+The compiler includes the `lumixjs` binary for direct use in build pipelines.
 
 ```bash
 # Basic compilation to JSON output (for integration)
-./luminjs-win32-x64.exe build App.lumin --format json
+./lumixjs.exe build App.lumix --format json
 
 # Production build with no emit (dry run)
-./luminjs-win32-x64.exe build App.lumin --no-emit
+./lumixjs.exe build App.lumix --no-emit
 ```
 
 ## Node.js API
@@ -33,10 +33,10 @@ The compiler includes the `luminjs-{platform}-{arch}` binary for direct use in b
 The package provides a high-level `compile` function for use in Node.js scripts or Vite plugins.
 
 ```typescript
-import { compile } from "@lumin-js/compiler";
+import { compile } from "@lumix-js/compiler";
 
 const code = await compile({
-  input: "src/App.lumin",
+  input: "src/App.lumix",
   bundle: false,
   checkTypes: true,
 });
@@ -44,7 +44,7 @@ const code = await compile({
 
 ### Options
 
-- `input`: Path to the `.lumin` file.
+- `input`: Path to the `.lumix` file.
 - `bundle`: Whether to bundle dependencies (default: true).
 - `checkTypes`: Enable/disable semantic TypeScript validation (default: true).
 

@@ -1,5 +1,5 @@
 {
-  "name": "lumin-js",
+  "name": "lumix-js",
   "version": "0.1.0",
   "description": "The modular runtime for LuminJS",
   "type": "module",
@@ -12,20 +12,20 @@
     "templates/"
   ],
   "bin": {
-    "lumin": "./bin/lumin.js"
+    "lumix": "./bin/lumix.js"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch"
   },
   "keywords": [
-    "luminjs",
+    "lumix-js",
     "runtime",
     "signals",
     "framework",
     "framework-cli"
   ],
-  "author": "LuminJS Team",
+  "author": "ZMDev",
   "license": "MIT",
   "devDependencies": {
     "happy-dom": "^20.6.1",
@@ -41,7 +41,7 @@
     "prompts": "^2.4.2",
     "picocolors": "^1.0.0",
     "bundle-require": "^5.0.0",
-    "vite-plugin-lumin": "workspace:*",
+    "vite-plugin-lumix": "workspace:*",
     "fs-extra": "^11.2.0"
   }
 }

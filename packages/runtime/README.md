@@ -1,31 +1,31 @@
-The `lumin-js` package provides a modular, fine-grained reactive runtime. It is the core engine that powers state management and DOM updates, and it also contains the primary LuminJS CLI.
+The `lumix-js` package provides a modular, fine-grained reactive runtime. It is the core engine that powers state management and DOM updates, and it also contains the primary LumixJS CLI.
 
 ## CLI Core Commands
 
-The `lumin` binary is the entry point for managing LuminJS projects.
+The `lumix` binary is the entry point for managing LumixJS projects.
 
-### `lumin init`
+### `lumix init`
 
 Creates a new project from a template.
 
 ```bash
-lumin init <project-name>
+lumix init <project-name>
 ```
 
-### `lumin dev`
+### `lumix dev`
 
 Starts the development server.
 
 ```bash
-lumin dev
+lumix dev
 ```
 
-### `lumin build`
+### `lumix build`
 
 Builds the project for production, generating compiled assets.
 
 ```bash
-lumin build
+lumix build
 ```
 
 ## Core Concepts
@@ -37,7 +37,7 @@ The runtime is built on the principle of fine-grained reactivity, using Signals 
 Signals are the primary primitive for reactive state. A signal holds a value and notifies its subscribers when that value changes.
 
 ```typescript
-import { signal } from "lumin-js";
+import { signal } from "lumix-js";
 
 const count = signal(0);
 
@@ -56,7 +56,7 @@ count.value = 10;
 Effects are functions that automatically re-run whenever the signals they depend on change.
 
 ```typescript
-import { signal, effect } from "lumin-js";
+import { signal, effect } from "lumix-js";
 
 const name = signal("Lumin");
 
@@ -72,7 +72,7 @@ name("World"); // Logs: "Hello, World!"
 Computed signals derive their value from other signals. They are automatically updated whenever their dependencies change.
 
 ```typescript
-import { signal, computed } from "lumin-js";
+import { signal, computed } from "lumix-js";
 
 const first = signal("John");
 const last = signal("Doe");
@@ -84,17 +84,17 @@ console.log(full()); // "John Doe"
 
 ## Lifecycle Hooks
 
-LuminJS provides hooks for managing component lifecycles.
+LumixJS provides hooks for managing component lifecycles.
 
 - `onMount(fn)`: Executes when the component is mounted to the DOM.
 - `onDestroy(fn)`: Executes when the component is unmounted.
 
 ## Global State Management (Store)
 
-For complex state that needs to be shared across components or persisted, LuminJS provides a robust Store system.
+For complex state that needs to be shared across components or persisted, LumixJS provides a robust Store system.
 
 ```typescript
-import { store, persist } from "lumin-js";
+import { store, persist } from "lumix-js";
 
 // Create a reactive store
 const auth = store({
@@ -120,7 +120,7 @@ The `bind` helper simplifies the synchronization between UI elements and signals
 
 ```svelte
 <script>
-  import { signal, bind } from "lumin-js";
+  import { signal, bind } from "lumix-js";
 
   const email = signal("");
 </script>
