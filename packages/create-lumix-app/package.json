@@ -1,0 +1,28 @@
+{
+  "name": "create-lumix",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "create-lumix": "./bin/create-lumix.js"
+  },
+  "files": [
+    "dist/",
+    "bin/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "lumix-js": "workspace:*",
+    "fs-extra": "^11.2.0",
+    "picocolors": "^1.0.0",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^25.2.3",
+    "@types/fs-extra": "^11.0.4",
+    "@types/prompts": "^2.4.9"
+  }
+}

@@ -2,7 +2,7 @@ import prompts from "prompts";
 import pc from "picocolors";
 import fs from "fs-extra";
 import path from "path";
-import { __dirname } from "./utils.js";
+import { createRequire } from "module";
 import { spawnSync } from "child_process";
 function hasCommand(cmd) {
     const which = process.platform === "win32" ? "where" : "which";
@@ -22,6 +22,7 @@ function getInstalledPackageManagers() {
         out.push("bun");
     if (hasCommand("pnpm"))
         out.push("pnpm");
+    // npm is assumed to exist if node exists; but still keep it as fallback.
     out.push("npm");
     return Array.from(new Set(out));
 }
@@ -37,7 +38,7 @@ function installCommand(pm) {
 }
 function runInstall(pm, cwd) {
     const cmd = pm;
-    const args = ["install"];
+    const args = pm === "npm" ? ["install"] : ["install"];
     const res = spawnSync(cmd, args, { cwd, stdio: "inherit" });
     if (res.error)
         throw res.error;
@@ -56,18 +57,25 @@ function isEnoentSpawnError(e) {
 function isSigintError(e) {
     return Boolean(e && typeof e === "object" && "code" in e && e.code === "SIGINT");
 }
-export async function init(name, options) {
-    console.log("");
-    console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim("v0.1.0")}`);
-    console.log(pc.dim("  Scaffolding a new project...\n"));
-    const templates = [
+function getTemplates() {
+    return [
         { title: "Blank", value: "blank" },
         { title: "Blank (TypeScript)", value: "blank-ts" },
         { title: "Sitemap (Coming soon...)", value: "sitemap", disabled: true },
     ];
-    const allowedTemplates = new Set(templates
-        .filter((t) => !t.disabled)
-        .map((t) => t.value));
+}
+function getLumixRuntimeTemplatesDir() {
+    // Resolve from the installed lumix-js package.
+    const require = createRequire(import.meta.url);
+    const pkgRoot = path.dirname(require.resolve("lumix-js/package.json"));
+    return path.join(pkgRoot, "templates");
+}
+export async function createLumixApp(name, options) {
+    console.log("");
+    console.log(`  ${pc.bold(pc.cyan("⚡ Create Lumix App"))} ${pc.dim("v0.1.0")}`);
+    console.log(pc.dim("  Scaffolding a new project...\n"));
+    const templates = getTemplates();
+    const allowedTemplates = new Set(templates.filter((t) => !t.disabled).map((t) => t.value));
     let template = options?.template;
     if (template && !allowedTemplates.has(template)) {
         console.log(pc.red(`\n  Error: Unknown template "${template}". Valid templates are: ${[...allowedTemplates].join(", ")}.\n`));
@@ -79,7 +87,7 @@ export async function init(name, options) {
             type: "text",
             name: "projectName",
             message: "Project name:",
-            initial: "my-lumin-app",
+            initial: "my-lumix-app",
         });
     }
     if (!template) {
@@ -107,7 +115,7 @@ export async function init(name, options) {
         initial: Math.max(0, installedPms.indexOf(detectedPm)),
         choices: installedPms.map((pm) => ({ title: pm, value: pm })),
     });
-    const response = questions.length > 0
+    const response = questions.length
         ? await prompts(questions, {
             onCancel() {
                 console.log(pc.red("\n  Aborted.\n"));
@@ -129,12 +137,12 @@ export async function init(name, options) {
         console.log(pc.red(`\n  Error: Directory "${projectName}" already exists.\n`));
         process.exit(1);
     }
-    const templateDir = path.resolve(__dirname, "../../templates", template);
+    const templatesDir = getLumixRuntimeTemplatesDir();
+    const templateDir = path.join(templatesDir, template);
     console.log(pc.dim("\n  Scaffolding project..."));
     try {
         await fs.ensureDir(targetDir);
         await fs.copy(templateDir, targetDir);
-        // Update package.json name
         const pkgPath = path.join(targetDir, "package.json");
         if (fs.existsSync(pkgPath)) {
             const pkg = await fs.readJson(pkgPath);

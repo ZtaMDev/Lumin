@@ -1,15 +1,11 @@
 <script>
-  import { signal, type Signal, effect } from "lumix-js";
-  const message: Signal<string> = signal("Hello LumixJS!");
-  const logger = effect(() => {
-    console.log(message());
-  });
+  import { signal } from "lumix-js";
+  const message = signal("Hello LumixJS!");
 </script>
 
 <div class="container">
   <h1>{message()}</h1>
   <p>Edit <code>src/App.lumix</code> to get started.</p>
-  <button onClick={() => message("Hello World!")}>Click me</button>
 </div>
 
 <style>

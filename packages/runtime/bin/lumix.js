@@ -30,7 +30,9 @@ program
 program
   .command("init")
   .description("Scaffold a new LuminJS project")
-  .action(init);
+  .argument("[name]", "Project name")
+  .option("-t, --template <template>", "Project template (blank, blank-ts)")
+  .action((name, options) => init(name, options));
 
 // Custom help output
 program.configureHelp({
