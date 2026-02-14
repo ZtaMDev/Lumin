@@ -23,7 +23,7 @@ jobs:
             artifact: luminjs-linux-arm64
             binary: luminjs
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-12
             artifact: luminjs-darwin-x64
             binary: luminjs
           - target: aarch64-apple-darwin
@@ -67,7 +67,7 @@ jobs:
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: |
-          mkdir dist
+          New-Item -ItemType Directory -Force -Path dist
           copy packages\compiler\target\${{ matrix.target }}\release\${{ matrix.binary }} dist\${{ matrix.binary }}
           cd dist && Compress-Archive -Path ${{ matrix.binary }} -DestinationPath ..\${{ matrix.artifact }}.zip
 
