@@ -14,7 +14,7 @@ lumin init <project-name>
 
 ### `lumin dev`
 
-Starts the development server with HMR.
+Starts the development server.
 
 ```bash
 lumin dev
@@ -22,7 +22,7 @@ lumin dev
 
 ### `lumin build`
 
-Builds the project for production, generating optimized SSG/SSR assets.
+Builds the project for production, generating compiled assets.
 
 ```bash
 lumin build
@@ -118,13 +118,17 @@ persist(auth, { key: "lumin_auth" });
 
 The `bind` helper simplifies the synchronization between UI elements and signals.
 
-```typescript
-import { signal, bind } from "luminjs";
+```svelte
+<script>
+  import { signal, bind } from "luminjs";
 
-const email = signal("");
+  const email = signal("");
+</script>
 
-// In your component logic or setup:
-// bind(inputElement, "value", email);
+<div class="field">
+    <label>Email</label>
+    <input type="email" bind:value={email} />
+</div>
 ```
 
 The runtime includes specific helpers for different input types:

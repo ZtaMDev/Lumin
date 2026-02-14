@@ -18,14 +18,14 @@ The compiler consists of a Rust core (`luminc`) and a Node.js wrapper that provi
 
 ## CLI Usage
 
-The compiler includes the `luminc` binary for direct use in build pipelines.
+The compiler includes the `lumin-{platform}-{arch}` binary for direct use in build pipelines.
 
 ```bash
 # Basic compilation to JSON output (for integration)
-luminc build App.lumin --format json
+./lumin-win32-x64.exe build App.lumin --format json
 
 # Production build with no emit (dry run)
-luminc build App.lumin --no-emit
+./lumin-win32-x64.exe build App.lumin --no-emit
 ```
 
 ## Node.js API
