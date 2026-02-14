@@ -21,7 +21,8 @@ export async function init() {
       name: "template",
       message: "Pick a template:",
       choices: [
-        { title: "Blank (Minimal)", value: "blank" },
+        { title: "Blank", value: "blank" },
+        { title: "Blank (TypeScript)", value: "blank-ts" },
         { title: "Sitemap (Coming soon...)", value: "sitemap", disabled: true },
       ],
     },

@@ -110,9 +110,15 @@ export default function lumin(config?: LuminConfig) {
           if (url === "/" || url === "/index.html") {
             const fs = await import("fs");
             const path = await import("path");
-            const physicalPath = path.join(server.config.root, "index.html");
+            const root = server.config.root;
+            const physicalPath = path.join(root, "index.html");
 
             if (!fs.existsSync(physicalPath)) {
+              // Auto-detect entry: main.ts > main.js
+              const entry = fs.existsSync(path.join(root, "main.ts"))
+                ? "/main.ts"
+                : "/main.js";
+
               let html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -121,7 +127,7 @@ export default function lumin(config?: LuminConfig) {
 </head>
 <body>
   <div id="${config?.rootId || "app"}"></div>
-  <script type="module" src="/main.js"></script>
+  <script type="module" src="${entry}"></script>
 </body>
 </html>`;
 

@@ -1,0 +1,17 @@
+{
+  "name": "ts-test",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "lumin dev",
+    "build": "lumin build",
+    "preview": "lumin preview"
+  },
+  "dependencies": {
+    "luminjs": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

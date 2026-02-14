@@ -21,6 +21,11 @@ export async function build() {
   try {
     if (!hasIndex) {
       tempIndex = true;
+      // Auto-detect entry: main.ts > main.js
+      const entry = fs.existsSync(path.join(cwd, "main.ts"))
+        ? "/main.ts"
+        : "/main.js";
+
       const defaultHtml = `
 <!DOCTYPE html>
 <html lang="en">
@@ -30,7 +35,7 @@ export async function build() {
 </head>
 <body>
   <div id="${config?.rootId || "app"}"></div>
-  <script type="module" src="/main.js"></script>
+  <script type="module" src="${entry}"></script>
 </body>
 </html>
       `.trim();
