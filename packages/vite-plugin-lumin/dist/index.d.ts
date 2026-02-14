@@ -14,9 +14,15 @@ interface LuminConfig {
 export default function lumin(config?: LuminConfig): {
     name: string;
     enforce: "pre";
-    transform(code: string, id: string): Promise<{
+    configResolved(resolvedConfig: any): void;
+    transform(this: any, code: string, id: string): Promise<{
         code: string;
         map: null;
+    } | {
+        code: string;
+        map: {
+            mappings: string;
+        };
     } | undefined>;
     transformIndexHtml(html: string): string;
     configureServer(server: any): () => void;

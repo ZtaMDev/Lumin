@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import os from "os";
+import { validateTypeScript } from "./type_checker.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +36,7 @@ export interface CompileOptions {
   input: string;
   outDirect?: string;
   bundle?: boolean;
+  checkTypes?: boolean;
 }
 
 export async function compile(options: CompileOptions): Promise<string> {
@@ -80,6 +82,25 @@ export async function compile(options: CompileOptions): Promise<string> {
     const json = JSON.parse(stdout);
 
     if (json.js !== undefined) {
+      if (options.checkTypes !== false && json.ts) {
+        const originalSource = fs.readFileSync(options.input, "utf-8");
+        const typeDiags = validateTypeScript(
+          json.ts,
+          options.input,
+          originalSource,
+        );
+
+        if (typeDiags.length > 0) {
+          const d = typeDiags[0];
+          const err = new Error(d.message);
+          (err as any).luminLoc = {
+            file: options.input,
+            line: d.line,
+            column: d.column,
+          };
+          throw err;
+        }
+      }
       return json.js;
     }
 

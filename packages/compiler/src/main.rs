@@ -70,14 +70,20 @@ fn main() {
                 no_html,
             ) {
                 Ok(js) => {
-                    if matches!(format, OutputFormat::Json) {
-                        let payload = serde_json::json!({
-                            "file": input.display().to_string(),
-                            "js": js,
-                            "diagnostics": [],
-                        });
-                        println!("{}", serde_json::to_string_pretty(&payload).unwrap());
-                    }
+                if matches!(format, OutputFormat::Json) {
+                    let source = std::fs::read_to_string(&input).unwrap_or_default();
+                    let component = luminjs::parser::parse_component(&source).unwrap();
+                    let component_name = input.file_stem().and_then(|s| s.to_str()).unwrap_or("Component");
+                    let ts = luminjs::ts_codegen::generate_ts(&component, component_name);
+
+                    let payload = serde_json::json!({
+                        "file": input.display().to_string(),
+                        "js": js,
+                        "ts": ts,
+                        "diagnostics": [],
+                    });
+                    println!("{}", serde_json::to_string_pretty(&payload).unwrap());
+                }
                 }
                 Err(err) => {
                     if err.to_string() == "build failed" {
@@ -149,8 +155,18 @@ fn run_build(
     if !diags.is_empty() {
         match format {
             OutputFormat::Json => {
+                let source = std::fs::read_to_string(&input).unwrap_or_default();
+                let component_res = luminjs::parser::parse_component(&source);
+                let ts = if let Ok(component) = component_res {
+                    let component_name = input.file_stem().and_then(|s| s.to_str()).unwrap_or("Component");
+                    luminjs::ts_codegen::generate_ts(&component, component_name)
+                } else {
+                    String::new()
+                };
+
                 let payload = serde_json::json!({
                     "file": input.display().to_string(),
+                    "ts": ts,
                     "diagnostics": diags,
                 });
                 println!("{}", serde_json::to_string_pretty(&payload)?);

@@ -15,11 +15,16 @@ interface LuminConfig {
 }
 
 export default function lumin(config?: LuminConfig) {
+  let isBuild = false;
+
   return {
     name: "vite-plugin-lumin",
     enforce: "pre" as const,
+    configResolved(resolvedConfig: any) {
+      isBuild = resolvedConfig.command === "build";
+    },
 
-    async transform(code: string, id: string) {
+    async transform(this: any, code: string, id: string) {
       if (!id.endsWith(".lumin")) return;
 
       try {
@@ -33,16 +38,40 @@ export default function lumin(config?: LuminConfig) {
           map: null,
         };
       } catch (e: any) {
-        const error = new Error(e.message);
-        (error as any).id = id;
-        (error as any).plugin = "vite-plugin-lumin";
+        const error: any = new Error(e.message);
+        error.id = id;
+        error.plugin = "vite-plugin-lumin";
 
+        // Generate code frame for better Vite error display
+        let frame = "";
         if (e.luminLoc) {
-          (error as any).loc = {
+          error.loc = {
             file: id,
             line: e.luminLoc.line,
             column: e.luminLoc.column,
           };
+
+          const lines = code.split("\n");
+          const lineIdx = e.luminLoc.line - 1;
+          if (lineIdx >= 0 && lineIdx < lines.length) {
+            const start = Math.max(0, lineIdx - 2);
+            const end = Math.min(lines.length, lineIdx + 3);
+            frame = lines
+              .slice(start, end)
+              .map((l, i) => {
+                const curr = start + i;
+                const prefix = curr === lineIdx ? " > " : "   ";
+                const lineNum = (curr + 1).toString().padStart(3, " ");
+                let out = `${prefix}${lineNum} | ${l}`;
+                if (curr === lineIdx) {
+                  const pad = " ".repeat(3 + 3 + 3 + e.luminLoc.column - 1);
+                  out += `\n${pad}^`;
+                }
+                return out;
+              })
+              .join("\n");
+            error.frame = frame;
+          }
         } else {
           const errorMsg = e.stderr || e.stdout || e.message || "Unknown error";
           const lines = errorMsg.split("\n");
@@ -50,10 +79,26 @@ export default function lumin(config?: LuminConfig) {
             lines.find((line: string) => line.trim().startsWith("error:")) ||
             errorMsg;
           error.message = specificError;
-          (error as any).loc = { file: id };
+          error.loc = { file: id };
         }
 
-        throw error;
+        if (isBuild) {
+          // In production build, we want a hard failure
+          this.error(error);
+        }
+
+        // In development, to avoid duplicate Vite logs, we log it once ourselves
+        // and return a module that throws in the browser.
+        console.error(
+          `\n\x1b[31m[vite-plugin-lumin] ${error.message}\x1b[0m\n` +
+            `\x1b[2mfile: ${id}:${error.loc?.line || 0}:${error.loc?.column || 0}\x1b[0m\n` +
+            (frame ? `\n${frame}\n` : ""),
+        );
+
+        return {
+          code: `throw new Error(${JSON.stringify(`[lumin] ${error.message}\n\n${frame}`)}); export default {};`,
+          map: { mappings: "" },
+        };
       }
     },
 

@@ -42,6 +42,7 @@ pub enum PropKind {
 pub struct Prop {
     pub name: String,
     pub default_value: Option<String>,
+    pub original_default_value: Option<String>, // Preserves TS types
     pub kind: PropKind,
 }
 
@@ -53,6 +54,7 @@ pub struct ScriptImport {
 #[derive(Debug, Clone)]
 pub struct ScriptBlock {
     pub code: String,
+    pub original_code: String, // Preserved for type checking
     pub imports: Vec<ScriptImport>,
     pub props: Vec<Prop>,
     pub span: Option<SourceRange>,

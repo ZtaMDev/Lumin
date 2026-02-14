@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import os from "os";
+import { validateTypeScript } from "./type_checker.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const packageRoot = path.resolve(__dirname, ".."); // dist/ -> package root
@@ -60,6 +61,20 @@ export async function compile(options) {
         const { stdout } = await execa(command, args);
         const json = JSON.parse(stdout);
         if (json.js !== undefined) {
+            if (options.checkTypes !== false && json.ts) {
+                const originalSource = fs.readFileSync(options.input, "utf-8");
+                const typeDiags = validateTypeScript(json.ts, options.input, originalSource);
+                if (typeDiags.length > 0) {
+                    const d = typeDiags[0];
+                    const err = new Error(d.message);
+                    err.luminLoc = {
+                        file: options.input,
+                        line: d.line,
+                        column: d.column,
+                    };
+                    throw err;
+                }
+            }
             return json.js;
         }
         if (json.diagnostics && json.diagnostics.length > 0) {

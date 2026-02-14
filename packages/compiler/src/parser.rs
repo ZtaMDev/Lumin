@@ -2,7 +2,7 @@ use crate::ast::*;
 use crate::error::CompileError;
 use crate::diagnostic::SourceRange as DiagnosticSourceRange;
 
-use swc_common::{FileName, SourceMap, DUMMY_SP};
+use swc_common::{FileName, SourceMap, DUMMY_SP, Spanned};
 use swc_ecma_ast::{ModuleDecl, ModuleItem, Decl, Pat, Callee};
 use swc_ecma_parser::{Parser, StringInput, Syntax, TsConfig};
 use crate::transpiler::{transpile_ts_module, emit_module_to_string};
@@ -55,33 +55,24 @@ pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
                 });
             }
             let script_start = parser.pos;
-            parser.pos += 8;
-            let end_idx = parser.input[parser.pos..].find("</script>");
-            if let Some(end) = end_idx {
-                let code = &parser.input[parser.pos..parser.pos + end];
-                let abs_start = parser.base_offset + parser.pos;
-                
-                let (cleaned_code, props, imports) = parse_script_block_contents(code)?;
+            parser.pos += 8; // skip <script>
+            
+            let (code, end_pos) = parser.parse_script_or_style_block("</script>")?;
+            let abs_start = parser.base_offset + script_start + 8;
+            
+            let (cleaned_code, props, imports) = parse_script_block_contents(&code)?;
 
-                component.script = Some(ScriptBlock {
-                    code: cleaned_code,
-                    props,
-                    imports,
-                    span: Some(SourceRange {
-                        start: abs_start,
-                        end: abs_start + code.len(),
-                    }),
-                });
-                parser.pos += end + 9;
-            } else {
-                return Err(CompileError::Template {
-                    message: "<script> without closing </script>".into(),
-                    range: Some(DiagnosticSourceRange {
-                        start: parser.base_offset + script_start,
-                        end: parser.base_offset + script_start + 8,
-                    }),
-                });
-            }
+            component.script = Some(ScriptBlock {
+                code: cleaned_code,
+                original_code: code.to_string(),
+                props,
+                imports,
+                span: Some(SourceRange {
+                    start: abs_start,
+                    end: abs_start + code.len(),
+                }),
+            });
+            parser.pos = end_pos + 9; // skip </script>
             continue;
         }
 
@@ -93,28 +84,19 @@ pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
                 });
             }
             let style_start = parser.pos;
-            parser.pos += 7;
-            let end_idx = parser.input[parser.pos..].find("</style>");
-            if let Some(end) = end_idx {
-                let code = &parser.input[parser.pos..parser.pos + end];
-                let abs_start = parser.base_offset + parser.pos;
-                component.style = Some(StyleBlock {
-                    code: code.to_string(),
-                    span: Some(SourceRange {
-                        start: abs_start,
-                        end: abs_start + code.len(),
-                    }),
-                });
-                parser.pos += end + 8;
-            } else {
-                return Err(CompileError::Template {
-                    message: "<style> without closing </style>".into(),
-                    range: Some(DiagnosticSourceRange {
-                        start: parser.base_offset + style_start,
-                        end: parser.base_offset + style_start + 7,
-                    }),
-                });
-            }
+            parser.pos += 7; // skip <style>
+            
+            let (code, end_pos) = parser.parse_script_or_style_block("</style>")?;
+            let abs_start = parser.base_offset + style_start + 7;
+            
+            component.style = Some(StyleBlock {
+                code: code.to_string(),
+                span: Some(SourceRange {
+                    start: abs_start,
+                    end: abs_start + code.len(),
+                }),
+            });
+            parser.pos = end_pos + 8; // skip </style>
             continue;
         }
 
@@ -249,7 +231,7 @@ fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<Scr
         match item {
             ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl)) => {
                 // Generate JS code for JUST this import
-                let mut temp_mod = swc_ecma_ast::Module {
+                let temp_mod = swc_ecma_ast::Module {
                     span: import_decl.span,
                     body: vec![ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl))],
                     shebang: None,
@@ -263,9 +245,15 @@ fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<Scr
                     for decl in &var_decl.decls {
                         if let Pat::Ident(ident) = &decl.name {
                             let name = ident.id.sym.to_string();
-                            let mut default_value = None;
-                            
                             if let Some(init) = &decl.init {
+                                let start = (init.span().lo.0 - fm.start_pos.0) as usize;
+                                let end = (init.span().hi.0 - fm.start_pos.0) as usize;
+                                let original_default_value = if start < end && end <= code.len() {
+                                    Some(code[start..end].to_string())
+                                } else {
+                                    None
+                                };
+
                                 let temp_mod = swc_ecma_ast::Module {
                                     span: DUMMY_SP,
                                     body: vec![ModuleItem::Stmt(swc_ecma_ast::Stmt::Expr(swc_ecma_ast::ExprStmt {
@@ -274,9 +262,11 @@ fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<Scr
                                     }))],
                                     shebang: None,
                                 };
-                                default_value = Some(emit_module_to_string(&temp_mod).trim_end_matches(';').trim().to_string());
+                                let default_value = Some(emit_module_to_string(&temp_mod).trim_end_matches(';').trim().to_string());
+                                props.push(Prop { name, default_value, original_default_value, kind: PropKind::Prop });
+                            } else {
+                                props.push(Prop { name, default_value: None, original_default_value: None, kind: PropKind::Prop });
                             }
-                            props.push(Prop { name, default_value, kind: PropKind::Prop });
                         }
                     }
                 }
@@ -292,10 +282,20 @@ fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<Scr
                                         is_prop_decl = true;
                                         // Handle props/signals
                                         if let Pat::Ident(binding) = &decl.name {
+                                            let original_default_value = call.args.get(0).map(|arg| {
+                                                let start = (arg.span().lo.0 - fm.start_pos.0) as usize;
+                                                let end = (arg.span().hi.0 - fm.start_pos.0) as usize;
+                                                if start < end && end <= code.len() {
+                                                    code[start..end].to_string()
+                                                } else {
+                                                    "".to_string()
+                                                }
+                                            });
+
                                             props.push(Prop {
                                                 name: binding.id.sym.to_string(),
                                                 default_value: call.args.get(0).map(|arg| {
-                                                    let mut temp_mod = swc_ecma_ast::Module {
+                                                    let temp_mod = swc_ecma_ast::Module {
                                                         span: DUMMY_SP,
                                                         body: vec![ModuleItem::Stmt(swc_ecma_ast::Stmt::Expr(swc_ecma_ast::ExprStmt {
                                                             span: DUMMY_SP,
@@ -305,6 +305,7 @@ fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<Scr
                                                     };
                                                     emit_module_to_string(&temp_mod).trim_end_matches(';').trim().to_string()
                                                 }),
+                                                original_default_value,
                                                 kind: if id.sym.as_ref() == "prop" { PropKind::Prop } else { PropKind::Signal },
                                             });
                                         }
@@ -442,6 +443,80 @@ impl<'a> MarkupParser<'a> {
                 }),
             })
         }
+    }
+
+    /// Robustly extracts content between <script>...</script> or <style>...</style>
+    /// by skipping strings and comments to find the closing tag.
+    fn parse_script_or_style_block(&mut self, terminator: &str) -> Result<(String, usize), CompileError> {
+        let start = self.pos;
+        let mut in_single = false;
+        let mut in_double = false;
+        let mut in_backtick = false;
+        let mut in_line_comment = false;
+        let mut in_block_comment = false;
+        let mut escaped = false;
+
+        while !self.is_eof() {
+            if !in_single && !in_double && !in_backtick && !in_line_comment && !in_block_comment {
+                if self.starts_with(terminator) {
+                    let code = self.input[start..self.pos].to_string();
+                    return Ok((code, self.pos));
+                }
+            }
+
+            let c = self.consume_char().unwrap();
+
+            if escaped {
+                escaped = false;
+                continue;
+            }
+
+            match c {
+                '\\' => {
+                    if in_single || in_double || in_backtick {
+                        escaped = true;
+                    }
+                }
+                '\'' if !in_double && !in_backtick && !in_line_comment && !in_block_comment => {
+                    in_single = !in_single;
+                }
+                '"' if !in_single && !in_backtick && !in_line_comment && !in_block_comment => {
+                    in_double = !in_double;
+                }
+                '`' if !in_single && !in_double && !in_line_comment && !in_block_comment => {
+                    in_backtick = !in_backtick;
+                }
+                '/' if !in_single && !in_double && !in_backtick => {
+                    if !in_line_comment && !in_block_comment {
+                        if self.starts_with("/") {
+                            self.consume_char();
+                            in_line_comment = true;
+                        } else if self.starts_with("*") {
+                            self.consume_char();
+                            in_block_comment = true;
+                        }
+                    }
+                }
+                '\n' if in_line_comment => {
+                    in_line_comment = false;
+                }
+                '*' if in_block_comment => {
+                    if self.starts_with("/") {
+                        self.consume_char();
+                        in_block_comment = false;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Err(CompileError::Template {
+            message: format!("unclosed block; expected {terminator}"),
+            range: Some(DiagnosticSourceRange {
+                start: self.base_offset + start - 8, // heuristic
+                end: self.base_offset + self.pos,
+            }),
+        })
     }
 
     fn parse_nodes(

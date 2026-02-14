@@ -5,6 +5,7 @@ pub mod error;
 pub mod js_validate;
 pub mod parser;
 pub mod codegen;
+pub mod ts_codegen;
 pub mod transpiler;
 
 use std::path::Path;
