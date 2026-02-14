@@ -48,6 +48,22 @@ pub enum TemplateNode {
     Element(ElementNode),
     Text(String),
     Expr(JsExpr),
+    ControlFlow(ControlFlowBlock),
+}
+
+#[derive(Debug, Clone)]
+pub enum ControlFlowBlock {
+    If {
+        condition: JsExpr,
+        then_branch: Vec<TemplateNode>,
+        else_ifs: Vec<(JsExpr, Vec<TemplateNode>)>,
+        else_branch: Option<Vec<TemplateNode>>,
+    },
+    For {
+        params: String,
+        key_expr: Option<String>,
+        body: Vec<TemplateNode>,
+    },
 }
 
 #[derive(Debug, Clone)]

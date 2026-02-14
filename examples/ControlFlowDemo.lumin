@@ -1,0 +1,91 @@
+<script>
+import { signal, onMount, onDestroy } from '@luminjs/runtime';
+
+let count = signal(0);
+let show = signal(true);
+let items = signal(["Apple", "Banana", "Cherry"]);
+
+onMount(() => {
+  console.log("ControlFlowDemo mounted");
+});
+
+onDestroy(() => {
+  console.log("ControlFlowDemo destroyed");
+});
+
+const toggle = () => show(!show());
+const inc = () => count(count() + 1);
+const dec = () => count(count() - 1);
+const addItem = () => {
+    const next = items().concat(`Item ${items().length + 1}`);
+    items(next);
+};
+const removeItem = () => {
+    const next = items().slice(0, -1);
+    items(next);
+};
+const shuffle = () => {
+    const next = [...items()].sort(() => Math.random() - 0.5);
+    items(next);
+};
+</script>
+
+<div>
+  <h1>Control Flow Demo</h1>
+  
+  <section>
+    <h2>Conditional Rendering</h2>
+    <button onClick={toggle}>Toggle Visible</button>
+    
+    @{if (show()) {
+      <div style="background: #e0f7fa; padding: 10px; border-radius: 8px; margin: 10px 0;">
+        <p>This content is togglable!</p>
+        
+        <div>
+           <button onClick={inc}>+</button>
+           <span style="margin: 0 10px;">Count: {count()}</span>
+           <button onClick={dec}>-</button>
+        </div>
+
+        @{if (count() > 0) {
+          <p style="color: green; font-weight: bold;">Count is positive</p>
+        } else if (count() < 0) {
+          <p style="color: red; font-weight: bold;">Count is negative</p>
+        } else {
+          <p style="color: gray;">Count is zero</p>
+        }}
+      </div>
+    } else {
+      <p>Content is hidden.</p>
+    }}
+  </section>
+
+  <hr />
+
+  <section>
+    <h2>Loops (Reactive List)</h2>
+    <button onClick={addItem}>Add Item</button>
+    <button onClick={removeItem}>Remove Item</button>
+    <button onClick={shuffle}>Shuffle Items</button>
+    
+    <ul>
+      @{for (let item of items(); key=item) {
+        <li>{item}</li>
+      }}
+    </ul>
+  </section>
+</div>
+
+<style>
+  section {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+  }
+  button {
+    padding: 5px 15px;
+    margin-right: 5px;
+    cursor: pointer;
+  }
+</style>

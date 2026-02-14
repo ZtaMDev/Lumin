@@ -7,128 +7,117 @@ use crate::diagnostic::SourceRange as DiagnosticSourceRange;
 /// - Detects a single `<script>...</script>` block.
 /// - Treats the rest as a flat template string (without deep tag parsing yet).
 pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
-    let mut rest: &str = source.trim_start();
-    let source_base_ptr = source.as_ptr() as usize;
+    let mut parser = MarkupParser::new(source, 0);
+    let mut component = ComponentFile {
+        imports: Vec::new(),
+        script: None,
+        style: None,
+        template: Vec::new(),
+    };
 
-    let mut imports: Vec<ComponentImport> = Vec::new();
-    let mut script: Option<ScriptBlock> = None;
-    let mut style: Option<StyleBlock> = None;
+    parser.skip_ws();
 
     // 1) Optional imports block at the beginning
-    if rest.starts_with("---") {
-        let end_idx = rest.find("---").and_then(|start: usize| {
-            let tail = &rest[start + 3..];
-            tail.find("---").map(|i: usize| start + 3 + i)
-        });
-
-        let end_idx = end_idx.ok_or_else(|| {
-            CompileError::Syntax {
+    if parser.starts_with("---") {
+        parser.pos += 3;
+        let start = parser.pos;
+        let end_idx = parser.input[start..].find("---");
+        if let Some(end) = end_idx {
+            let imports_block = &parser.input[start..start + end];
+            component.imports = parse_imports_block(imports_block)?;
+            parser.pos = start + end + 3;
+        } else {
+            return Err(CompileError::Syntax {
                 message: "imports block '---' without closing '---'".into(),
                 range: Some(DiagnosticSourceRange { start: 0, end: 3 }),
-            }
-        })?;
-
-        let imports_block = &rest[3..end_idx];
-        imports = parse_imports_block(imports_block)?;
-        rest = &rest[end_idx + 3..].trim_start();
+            });
+        }
     }
 
-    // 2) Optional <script> and <style> blocks (looping to allow any order)
+    // 2) Collect everything in a loop
     loop {
-        rest = rest.trim_start();
-        if rest.starts_with("<script>") {
-            if script.is_some() {
-                return Err(CompileError::Syntax {
+        parser.skip_ws();
+        if parser.is_eof() {
+            break;
+        }
+
+        if parser.starts_with("<script>") {
+            if component.script.is_some() {
+                return Err(CompileError::Template {
                     message: "only one <script> block is allowed".into(),
                     range: None,
                 });
             }
-            let after_open = "<script>".len();
-            let script_end = rest[after_open..]
-                .find("</script>")
-                .ok_or_else(|| {
-                    let start = rest.as_ptr() as usize - source_base_ptr;
-                    CompileError::Syntax {
-                        message: "<script> without closing </script>".into(),
-                        range: Some(DiagnosticSourceRange {
-                            start,
-                            end: start + after_open,
-                        }),
-                    }
-                })?;
-            let script_code = &rest[after_open..after_open + script_end];
-            let abs_start = (rest.as_ptr() as usize - source_base_ptr) + after_open;
-            
-            script = Some(ScriptBlock {
-                code: script_code.to_string(),
-                span: Some(SourceRange {
-                    start: abs_start,
-                    end: abs_start + script_code.len(),
-                }),
-            });
-            rest = &rest[after_open + script_end + "</script>".len()..];
-        } else if rest.starts_with("<style>") {
-            if style.is_some() {
-                return Err(CompileError::Syntax {
+            let script_start = parser.pos;
+            parser.pos += 8;
+            let end_idx = parser.input[parser.pos..].find("</script>");
+            if let Some(end) = end_idx {
+                let code = &parser.input[parser.pos..parser.pos + end];
+                let abs_start = parser.base_offset + parser.pos;
+                component.script = Some(ScriptBlock {
+                    code: code.to_string(),
+                    span: Some(SourceRange {
+                        start: abs_start,
+                        end: abs_start + code.len(),
+                    }),
+                });
+                parser.pos += end + 9;
+            } else {
+                return Err(CompileError::Template {
+                    message: "<script> without closing </script>".into(),
+                    range: Some(DiagnosticSourceRange {
+                        start: parser.base_offset + script_start,
+                        end: parser.base_offset + script_start + 8,
+                    }),
+                });
+            }
+            continue;
+        }
+
+        if parser.starts_with("<style>") {
+            if component.style.is_some() {
+                return Err(CompileError::Template {
                     message: "only one <style> block is allowed".into(),
                     range: None,
                 });
             }
-            let after_open = "<style>".len();
-            let style_end = rest[after_open..]
-                .find("</style>")
-                .ok_or_else(|| {
-                    let start = rest.as_ptr() as usize - source_base_ptr;
-                    CompileError::Syntax {
-                        message: "<style> without closing </style>".into(),
-                        range: Some(DiagnosticSourceRange {
-                            start,
-                            end: start + after_open,
-                        }),
-                    }
-                })?;
-            let style_code = &rest[after_open..after_open + style_end];
-            let abs_start = (rest.as_ptr() as usize - source_base_ptr) + after_open;
-
-            style = Some(StyleBlock {
-                code: style_code.to_string(),
-                span: Some(SourceRange {
-                    start: abs_start,
-                    end: abs_start + style_code.len(),
-                }),
-            });
-            rest = &rest[after_open + style_end + "</style>".len()..];
-        } else {
-            break;
+            let style_start = parser.pos;
+            parser.pos += 7;
+            let end_idx = parser.input[parser.pos..].find("</style>");
+            if let Some(end) = end_idx {
+                let code = &parser.input[parser.pos..parser.pos + end];
+                let abs_start = parser.base_offset + parser.pos;
+                component.style = Some(StyleBlock {
+                    code: code.to_string(),
+                    span: Some(SourceRange {
+                        start: abs_start,
+                        end: abs_start + code.len(),
+                    }),
+                });
+                parser.pos += end + 8;
+            } else {
+                return Err(CompileError::Template {
+                    message: "<style> without closing </style>".into(),
+                    range: Some(DiagnosticSourceRange {
+                        start: parser.base_offset + style_start,
+                        end: parser.base_offset + style_start + 7,
+                    }),
+                });
+            }
+            continue;
         }
+
+        // Must be template
+        let nodes = parser.parse_nodes(None, None)?;
+        if nodes.is_empty() && !parser.is_eof() {
+             // If we didn't get any nodes but aren't at EOF, something is wrong
+             // (e.g. we're stuck at a tag we didn't handle)
+             break;
+        }
+        component.template.extend(nodes);
     }
 
-    let template_src = rest.trim();
-    let template = if template_src.is_empty() {
-        Vec::new()
-    } else {
-        let template_base_offset = rest.as_ptr() as usize - source_base_ptr;
-        let mut p = MarkupParser::new(template_src, template_base_offset);
-        let nodes = p.parse_nodes(None)?;
-        p.skip_ws();
-        if !p.is_eof() {
-            return Err(CompileError::Template {
-                message: "unexpected trailing input in template".into(),
-                range: Some(DiagnosticSourceRange {
-                    start: p.base_offset + p.pos,
-                    end: source.len(),
-                }),
-            });
-        }
-        nodes
-    };
-
-    Ok(ComponentFile {
-        imports,
-        script,
-        style,
-        template,
-    })
+    Ok(component)
 }
 
 fn parse_imports_block(block: &str) -> Result<Vec<ComponentImport>, CompileError> {
@@ -290,10 +279,27 @@ impl<'a> MarkupParser<'a> {
         }
     }
 
-    fn parse_nodes(&mut self, closing_tag: Option<&str>) -> Result<Vec<TemplateNode>, CompileError> {
+    fn parse_nodes(
+        &mut self,
+        closing_tag: Option<&str>,
+        terminator: Option<&str>,
+    ) -> Result<Vec<TemplateNode>, CompileError> {
         let mut nodes: Vec<TemplateNode> = Vec::new();
 
         while !self.is_eof() {
+            if let Some(term) = terminator {
+                if self.starts_with(term) {
+                    return Ok(nodes);
+                }
+            }
+
+            // Top-level blocks should stop template parsing
+            if closing_tag.is_none() && terminator.is_none() {
+                if self.starts_with("<script>") || self.starts_with("<style>") || self.starts_with("---") {
+                    break;
+                }
+            }
+
             if self.starts_with("</") {
                 let _saved = self.pos;
                 self.pos += 2;
@@ -329,13 +335,19 @@ impl<'a> MarkupParser<'a> {
                 continue;
             }
 
+            if self.starts_with("@{") {
+                let cf = self.parse_control_flow_block()?;
+                nodes.push(TemplateNode::ControlFlow(cf));
+                continue;
+            }
+
             if self.starts_with("{") {
                 let expr = self.parse_braced_js_expr()?;
                 nodes.push(TemplateNode::Expr(expr));
                 continue;
             }
 
-            let text = self.parse_text()?;
+            let text = self.parse_text(terminator)?;
             if !text.is_empty() {
                 nodes.push(TemplateNode::Text(text));
             }
@@ -353,16 +365,170 @@ impl<'a> MarkupParser<'a> {
 
         Ok(nodes)
     }
-
-    fn parse_text(&mut self) -> Result<String, CompileError> {
+    fn parse_text(&mut self, terminator: Option<&str>) -> Result<String, CompileError> {
         let start = self.pos;
         while !self.is_eof() {
-            if self.starts_with("<") || self.starts_with("{") {
+            if self.starts_with("<") || self.starts_with("{") || self.starts_with("@{") {
                 break;
+            }
+            if let Some(term) = terminator {
+                if self.starts_with(term) {
+                    break;
+                }
             }
             self.consume_char();
         }
         Ok(self.input[start..self.pos].to_string())
+    }
+
+    fn parse_control_flow_block(&mut self) -> Result<ControlFlowBlock, CompileError> {
+        self.expect("@{")?;
+        self.skip_ws();
+
+        if self.starts_with("if") {
+            self.pos += 2;
+            self.skip_ws();
+            self.expect("(")?;
+            let condition = self.parse_paren_js_expr()?;
+            self.expect(")")?;
+            self.skip_ws();
+
+            let then_branch = self.parse_control_flow_branch()?;
+            let mut else_ifs = Vec::new();
+            let mut else_branch = None;
+
+            loop {
+                self.skip_ws();
+                if self.starts_with("else if") {
+                    self.pos += 7;
+                    self.skip_ws();
+                    self.expect("(")?;
+                    let cond = self.parse_paren_js_expr()?;
+                    self.expect(")")?;
+                    self.skip_ws();
+                    let body = self.parse_control_flow_branch()?;
+                    else_ifs.push((cond, body));
+                } else if self.starts_with("else") {
+                    self.pos += 4;
+                    self.skip_ws();
+                    else_branch = Some(self.parse_control_flow_branch()?);
+                    break;
+                } else {
+                    break;
+                }
+            }
+
+            self.skip_ws();
+            self.expect("}")?;
+            
+            Ok(ControlFlowBlock::If {
+                condition,
+                then_branch,
+                else_ifs,
+                else_branch,
+            })
+        } else if self.starts_with("for") {
+            self.pos += 3;
+            self.skip_ws();
+            self.expect("(")?;
+            
+            // For params: we just want the string inside (e.g. "let item of items")
+            let start = self.pos;
+            let mut depth = 1;
+            while !self.is_eof() && depth > 0 {
+                let c = self.consume_char().unwrap();
+                if c == '(' { depth += 1; }
+                else if c == ')' { depth -= 1; }
+            }
+            if depth != 0 {
+                return Err(CompileError::Template {
+                    message: "unterminated '(' in for block".into(),
+                    range: None,
+                });
+            }
+            let params_full = self.input[start..self.pos-1].trim();
+            let mut parts = params_full.split(';');
+            let params = parts.next().unwrap_or("").trim().to_string();
+            let mut key_expr = None;
+            for part in parts {
+                let p = part.trim();
+                if p.starts_with("key=") {
+                    key_expr = Some(p[4..].trim().to_string());
+                }
+            }
+            
+            self.skip_ws();
+            let body = self.parse_control_flow_branch()?;
+            
+            self.skip_ws();
+            self.expect("}")?;
+
+            Ok(ControlFlowBlock::For {
+                params,
+                key_expr,
+                body,
+            })
+        } else {
+            Err(CompileError::Template {
+                message: "expected 'if' or 'for' after '@{'".into(),
+                range: Some(DiagnosticSourceRange {
+                    start: self.base_offset + self.pos,
+                    end: self.base_offset + self.pos + 1,
+                }),
+            })
+        }
+    }
+
+    fn parse_control_flow_branch(&mut self) -> Result<Vec<TemplateNode>, CompileError> {
+        self.skip_ws();
+        if self.starts_with("{") {
+            self.pos += 1;
+            let nodes = self.parse_nodes(None, Some("}"))?;
+            self.skip_ws();
+            self.expect("}")?;
+            Ok(nodes)
+        } else {
+            // Single node branch
+            if self.starts_with("<") {
+                let el = self.parse_element()?;
+                Ok(vec![TemplateNode::Element(el)])
+            } else if self.starts_with("{") {
+                let expr = self.parse_braced_js_expr()?;
+                Ok(vec![TemplateNode::Expr(expr)])
+            } else {
+                // Must be text
+                let text = self.parse_text(None)?;
+                Ok(vec![TemplateNode::Text(text)])
+            }
+        }
+    }
+
+    fn parse_paren_js_expr(&mut self) -> Result<JsExpr, CompileError> {
+        let start = self.pos;
+        let mut depth = 1;
+        while !self.is_eof() && depth > 0 {
+            let c = self.peek_char().unwrap();
+            if c == '(' {
+                depth += 1;
+                self.consume_char();
+            } else if c == ')' {
+                depth -= 1;
+                if depth > 0 {
+                    self.consume_char();
+                }
+            } else {
+                self.consume_char();
+            }
+        }
+        
+        let code = self.input[start..self.pos].trim().to_string();
+        Ok(JsExpr {
+            code,
+            span: Some(SourceRange {
+                start: self.base_offset + start,
+                end: self.base_offset + self.pos,
+            }),
+        })
     }
 
     fn parse_element(&mut self) -> Result<ElementNode, CompileError> {
@@ -392,7 +558,7 @@ impl<'a> MarkupParser<'a> {
         }
 
         self.expect(">")?;
-        let children = self.parse_nodes(Some(&tag_name))?;
+        let children = self.parse_nodes(Some(&tag_name), None)?;
 
         Ok(ElementNode {
             tag_name,

@@ -40,8 +40,8 @@ pub fn diagnose_forbidden_lumin_imports_in_module(
             let src = import_decl.src.value.to_string();
             if src.ends_with(".lumin") {
                 let span: Span = import_decl.src.span;
-                let start = span.lo.0 as usize;
-                let end = span.hi.0 as usize;
+                let start = (span.lo.0 - fm.start_pos.0) as usize;
+                let end = (span.hi.0 - fm.start_pos.0) as usize;
                 let abs_start = snippet_start_offset + start;
                 let abs_end = snippet_start_offset + end;
                 let (lc_start, lc_end) = range_to_line_cols(line_starts, abs_start, abs_end);
@@ -90,13 +90,10 @@ pub fn validate_js_snippet(
 
     if let Err(err) = parse_result {
         let span: Span = err.span();
-        let msg = err
-            .kind()
-            .msg()
-            .to_string();
+        let msg = err.kind().msg().to_string();
 
-        let start = span.lo.0 as usize;
-        let end = span.hi.0 as usize;
+        let start = (span.lo.0 - fm.start_pos.0) as usize;
+        let end = (span.hi.0 - fm.start_pos.0) as usize;
 
         // Map snippet offsets into the full .lumin file
         let abs_start = snippet_start_offset + start;
@@ -118,13 +115,10 @@ pub fn validate_js_snippet(
     // Also surface any trailing errors emitted by the parser (recovery errors)
     for err in parser.take_errors() {
         let span: Span = err.span();
-        let msg = err
-            .kind()
-            .msg()
-            .to_string();
+        let msg = err.kind().msg().to_string();
 
-        let start = span.lo.0 as usize;
-        let end = span.hi.0 as usize;
+        let start = (span.lo.0 - fm.start_pos.0) as usize;
+        let end = (span.hi.0 - fm.start_pos.0) as usize;
 
         let abs_start = snippet_start_offset + start;
         let abs_end = snippet_start_offset + end;

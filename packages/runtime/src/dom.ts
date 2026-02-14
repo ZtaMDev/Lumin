@@ -1,5 +1,6 @@
 import { Signal, effect } from "./signals";
 import { bind } from "./bind";
+import { withHooks, runHooks } from "./lifecycle";
 
 export type AttrValue = string | number | boolean | (() => any) | Signal<any>;
 
@@ -8,12 +9,26 @@ export interface Props {
 }
 
 export function h(
-  tag: string | ((props: Props, ...children: any[]) => HTMLElement),
+  tag: string | ((props: Props, ...children: any[]) => any),
   props: Props | null,
   ...children: any[]
-): HTMLElement {
+): any {
   if (typeof tag === "function") {
-    return tag(props || {}, ...children);
+    const { result, mount, destroy } = withHooks(() =>
+      tag(props || {}, ...children),
+    );
+
+    // If it's a component that returns a single element, we can attach hooks to it
+    if (result instanceof HTMLElement) {
+      if (mount.length > 0) {
+        // Simple trick: use MutationObserver or just run on next tick if added
+        setTimeout(() => runHooks(mount), 0);
+      }
+      if (destroy.length > 0) {
+        (result as any)._luminDestroy = destroy;
+      }
+    }
+    return result;
   }
 
   const el = document.createElement(tag);
@@ -66,12 +81,55 @@ export function h(
     if (child === null || child === undefined) continue;
 
     if (typeof child === "function") {
-      // Reactive text node (Signal or closure)
-      const textNode = document.createTextNode("");
-      el.appendChild(textNode);
+      // Reactive block (Signal, closure, or control flow helper)
+      const startMarker = document.createComment("cf-start");
+      const endMarker = document.createComment("cf-end");
+      el.appendChild(startMarker);
+      el.appendChild(endMarker);
+
+      let prevNodes: Node[] = [];
+
       effect(() => {
-        const v = (child as Function)();
-        textNode.textContent = String(v ?? "");
+        let v = (child as Function)();
+
+        // Normalize to array of nodes
+        let newNodes: Node[] = [];
+        const items = Array.isArray(v) ? v.flat(Infinity) : [v];
+
+        for (let item of items) {
+          if (item === null || item === undefined) continue;
+
+          while (typeof item === "function") {
+            item = item();
+          }
+
+          if (item instanceof Node) {
+            newNodes.push(item);
+          } else {
+            newNodes.push(document.createTextNode(String(item)));
+          }
+        }
+
+        // --- Improved Reconciliation ---
+        const newNodeSet = new Set(newNodes);
+
+        // 1. Remove and unmount only nodes that are NOT in the new set
+        for (const node of prevNodes) {
+          if (!newNodeSet.has(node)) {
+            unmount(node);
+            if (node.parentNode === el) {
+              el.removeChild(node);
+            }
+          }
+        }
+
+        // 2. Insert or move nodes
+        // insertBefore naturally handles moves (reaches same state if already correctly positioned)
+        for (const node of newNodes) {
+          el.insertBefore(node, endMarker);
+        }
+
+        prevNodes = newNodes;
       });
     } else if (child instanceof Node) {
       el.appendChild(child);
@@ -83,11 +141,24 @@ export function h(
   return el;
 }
 
+export function Fragment(_props: any, ...children: any[]) {
+  return children.flat(Infinity);
+}
+
+function unmount(node: Node) {
+  if (node instanceof HTMLElement) {
+    const hooks = (node as any)._luminDestroy;
+    if (hooks) runHooks(hooks);
+  }
+  node.childNodes.forEach(unmount);
+}
+
 export function hydrate(
   root: HTMLElement,
   component: (props?: any) => HTMLElement,
   props?: any,
 ) {
   while (root.firstChild) root.removeChild(root.firstChild);
-  root.appendChild(component(props));
+  const el = h(component, props || {});
+  root.appendChild(el);
 }

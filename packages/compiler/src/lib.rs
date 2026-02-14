@@ -153,6 +153,43 @@ pub(crate) fn lib_collect_expr_diagnostics(
 
                 lib_collect_expr_diagnostics(source, line_starts, &el.children, out);
             }
+            ast::TemplateNode::ControlFlow(cf) => match cf {
+                ast::ControlFlowBlock::If {
+                    condition,
+                    then_branch,
+                    else_ifs,
+                    else_branch,
+                } => {
+                    if let Some(span) = condition.span.as_ref() {
+                        out.extend(validate_js_snippet(
+                            source,
+                            line_starts,
+                            &condition.code,
+                            span.start,
+                            JsSnippetKind::Expression,
+                        ));
+                    }
+                    lib_collect_expr_diagnostics(source, line_starts, then_branch, out);
+                    for (cond, branch) in else_ifs {
+                        if let Some(span) = cond.span.as_ref() {
+                            out.extend(validate_js_snippet(
+                                source,
+                                line_starts,
+                                &cond.code,
+                                span.start,
+                                JsSnippetKind::Expression,
+                            ));
+                        }
+                        lib_collect_expr_diagnostics(source, line_starts, branch, out);
+                    }
+                    if let Some(branch) = else_branch {
+                        lib_collect_expr_diagnostics(source, line_starts, branch, out);
+                    }
+                }
+                ast::ControlFlowBlock::For { body, .. } => {
+                    lib_collect_expr_diagnostics(source, line_starts, body, out);
+                }
+            },
         }
     }
 }
