@@ -16,7 +16,6 @@ The goal of LuminJS is to provide an "Astro-like" experience where performance i
 - **Signals and Effects**: Native primitives for reactive state management.
 - **Reactive Control Flow**: Built-in syntax for conditional rendering and loops.
 - **Type Safety**: Full semantic TypeScript validation for both logic and templates.
-- **Vite Integration**: First-class support for Vite with Hot Module Replacement (HMR).
 
 ## Installation
 
