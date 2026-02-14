@@ -1,4 +1,4 @@
-import { hydrate } from "@luminjs/runtime";
+import { hydrate } from "luminjs";
 import App from "./LayoutDemo.lumin";
 
 const root = document.getElementById("app");

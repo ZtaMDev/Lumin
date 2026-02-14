@@ -21,7 +21,8 @@
     "vite": "^5.0.0"
   },
   "dependencies": {
-    "@luminjs/compiler": "workspace:*"
+    "@luminjs/compiler": "workspace:*",
+    "luminjs": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.3.9",

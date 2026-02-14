@@ -1,4 +1,4 @@
-import { Signal, effect } from "./signals";
+import { Signal, effect } from "./signals.js";
 
 // ─── Core bind helper ──────────────────────────────────────
 function setupBind(

@@ -4,7 +4,7 @@ import ControlFlowDemo from "./ControlFlowDemo.lumin"
 ---
 
 <script>
-  import { signal } from "@luminjs/runtime";
+  import { signal } from "luminjs";
   const showExtra = signal(false);
   const toggle = () => showExtra(!showExtra());
 </script>

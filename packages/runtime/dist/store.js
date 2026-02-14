@@ -1,4 +1,4 @@
-import { signal, batch } from "./signals";
+import { signal, batch } from "./signals.js";
 // ─── store() ───────────────────────────────────────────────
 export function store(initialState) {
     const initial = structuredClone(initialState);

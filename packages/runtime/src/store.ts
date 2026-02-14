@@ -1,4 +1,4 @@
-import { signal, effect, batch, Signal, Unsubscribe } from "./signals";
+import { signal, effect, batch, Signal, Unsubscribe } from "./signals.js";
 
 // ─── Types ─────────────────────────────────────────────────
 export type StoreListener<T> = (state: T, key?: string) => void;

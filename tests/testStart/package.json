@@ -1,0 +1,14 @@
+{
+  "name": "test-start",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "lumin dev",
+    "build": "lumin build",
+    "preview": "lumin preview"
+  },
+  "dependencies": {
+    "luminjs": "latest"
+  }
+}

@@ -1,4 +1,4 @@
-import { Signal } from "./signals";
+import { Signal } from "./signals.js";
 /** Two-way binding for text inputs, textareas, and selects */
 export declare function bindValue(el: HTMLElement, sig: Signal<string>): void;
 /** Two-way binding for checkboxes */

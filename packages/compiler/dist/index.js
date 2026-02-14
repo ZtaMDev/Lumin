@@ -23,15 +23,14 @@ function findBinary() {
     return null;
 }
 export async function compile(options) {
-    const tempOutDir = path.join(packageRoot, ".temp_build");
     // Build CLI arguments (shared between binary and cargo run)
     const cliArgs = [
         "build",
         options.input,
-        "--out",
-        tempOutDir,
         "--format",
         "json",
+        "--no-html",
+        "--no-emit",
     ];
     if (options.bundle === false) {
         cliArgs.push("--no-bundle");
@@ -58,14 +57,24 @@ export async function compile(options) {
         ];
     }
     try {
-        await execa(command, args);
-        const filename = path.basename(options.input, ".lumin") + ".js";
-        const outPath = path.join(tempOutDir, filename);
-        if (!fs.existsSync(outPath)) {
-            throw new Error(`Output file not found: ${outPath}`);
+        const { stdout } = await execa(command, args);
+        const json = JSON.parse(stdout);
+        if (json.js !== undefined) {
+            return json.js;
         }
-        const code = fs.readFileSync(outPath, "utf-8");
-        return code;
+        if (json.diagnostics && json.diagnostics.length > 0) {
+            const d = json.diagnostics[0];
+            const err = new Error(d.message);
+            err.luminStart = d.start;
+            err.luminEnd = d.end;
+            err.luminLoc = {
+                file: options.input,
+                line: d.start.line,
+                column: d.start.col,
+            };
+            throw err;
+        }
+        throw new Error(`Unexpected output from compiler: ${stdout}`);
     }
     catch (e) {
         if (e.stdout) {

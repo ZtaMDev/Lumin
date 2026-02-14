@@ -1,4 +1,4 @@
-import { Signal } from "./signals";
+import { Signal } from "./signals.js";
 export type AttrValue = string | number | boolean | (() => any) | Signal<any>;
 export interface Props {
     [key: string]: AttrValue;

@@ -35,6 +35,10 @@ enum Commands {
         /// Do not emit a single bundle.js; output a module per file
         #[arg(long)]
         no_bundle: bool,
+
+        /// Do not generate an index.html file
+        #[arg(long)]
+        no_html: bool,
     },
 }
 
@@ -54,53 +58,75 @@ fn main() {
             format,
             no_emit,
             no_bundle,
+            no_html,
         } => {
             let bundle = !no_bundle;
-            if let Err(err) = run_build(input.clone(), out, format.clone(), no_emit, bundle) {
-                // If the error is just "build failed", diagnostics have already been printed by run_build.
-                // We don't want to print a second JSON object or error message.
-                if err.to_string() == "build failed" {
-                    std::process::exit(1);
-                }
-
-                match format {
-                    OutputFormat::Json => {
-                        let mut payload = serde_json::json!({
+            match run_build(
+                input.clone(),
+                out.clone(),
+                format.clone(),
+                no_emit,
+                bundle,
+                no_html,
+            ) {
+                Ok(js) => {
+                    if matches!(format, OutputFormat::Json) {
+                        let payload = serde_json::json!({
                             "file": input.display().to_string(),
-                            "error": err.to_string(),
+                            "js": js,
+                            "diagnostics": [],
                         });
-
-                        if let Some(ce) = err.downcast_ref::<CompileError>() {
-                             let range = match ce {
-                                CompileError::Syntax { range, .. } => range,
-                                CompileError::InvalidStructure { range, .. } => range,
-                                CompileError::Template { range, .. } => range,
-                             };
-                             
-                             if let Some(r) = range {
-                                 if let Ok(source) = std::fs::read_to_string(&input) {
-                                     let starts = luminjs::diagnostic::compute_line_starts(&source);
-                                     let (start_lc, end_lc) = luminjs::diagnostic::range_to_line_cols(&starts, r.start, r.end);
-                                     
-                                     payload = serde_json::json!({
-                                        "file": input.display().to_string(),
-                                        "error": err.to_string(),
-                                        "line": start_lc.line,
-                                        "column": start_lc.col,
-                                        "endLine": end_lc.line,
-                                        "endColumn": end_lc.col
-                                     });
-                                 }
-                             }
-                        }
-
                         println!("{}", serde_json::to_string_pretty(&payload).unwrap());
                     }
-                    OutputFormat::Pretty => {
-                        eprintln!("error: {:#}", err);
-                    }
                 }
-                std::process::exit(1);
+                Err(err) => {
+                    if err.to_string() == "build failed" {
+                        std::process::exit(1);
+                    }
+
+                    match format {
+                        OutputFormat::Json => {
+                            let mut payload = serde_json::json!({
+                                "file": input.display().to_string(),
+                                "error": err.to_string(),
+                            });
+
+                            if let Some(ce) = err.downcast_ref::<CompileError>() {
+                                let range = match ce {
+                                    CompileError::Syntax { range, .. } => range,
+                                    CompileError::InvalidStructure { range, .. } => range,
+                                    CompileError::Template { range, .. } => range,
+                                };
+
+                                if let Some(r) = range {
+                                    if let Ok(source) = std::fs::read_to_string(&input) {
+                                        let starts =
+                                            luminjs::diagnostic::compute_line_starts(&source);
+                                        let (start_lc, end_lc) =
+                                            luminjs::diagnostic::range_to_line_cols(
+                                                &starts, r.start, r.end,
+                                            );
+
+                                        payload = serde_json::json!({
+                                           "file": input.display().to_string(),
+                                           "error": err.to_string(),
+                                           "line": start_lc.line,
+                                           "column": start_lc.col,
+                                           "endLine": end_lc.line,
+                                           "endColumn": end_lc.col
+                                        });
+                                    }
+                                }
+                            }
+
+                            println!("{}", serde_json::to_string_pretty(&payload).unwrap());
+                        }
+                        OutputFormat::Pretty => {
+                            eprintln!("error: {:#}", err);
+                        }
+                    }
+                    std::process::exit(1);
+                }
             }
         }
     }
@@ -112,7 +138,8 @@ fn run_build(
     format: OutputFormat,
     no_emit: bool,
     bundle: bool,
-) -> anyhow::Result<()> {
+    no_html: bool,
+) -> anyhow::Result<String> {
     let (js, diags) = if bundle {
         let res = luminjs::bundler::bundle_entry(&input)?;
         (res.js, res.diagnostics)
@@ -152,7 +179,7 @@ fn run_build(
         if matches!(format, OutputFormat::Pretty) {
             println!("{}", "ok (no-emit)".green().bold());
         }
-        return Ok(());
+        return Ok(js);
     }
 
     std::fs::create_dir_all(&out_dir)?;
@@ -171,7 +198,7 @@ fn run_build(
     };
 
     let out_path = out_dir.join(out_file_name);
-    std::fs::write(&out_path, js)?;
+    std::fs::write(&out_path, &js)?;
 
     if !bundle {
         // Copy runtime.js if it exists in the project directory (module mode)
@@ -180,6 +207,10 @@ fn run_build(
             let runtime_dst = out_dir.join("runtime.js");
             std::fs::copy(&runtime_src, &runtime_dst)?;
         }
+    }
+
+    if no_html {
+        return Ok(js);
     }
 
     // Generate a simple index.html in the output directory that wires up hydrate
@@ -242,5 +273,5 @@ fn run_build(
         );
     }
 
-    Ok(())
+    Ok(js)
 }

@@ -1,6 +1,6 @@
-import { effect } from "./signals";
-import { bind } from "./bind";
-import { withHooks, runHooks } from "./lifecycle";
+import { effect } from "./signals.js";
+import { bind } from "./bind.js";
+import { withHooks, runHooks } from "./lifecycle.js";
 export function h(tag, props, ...children) {
     if (typeof tag === "function") {
         const { result, mount, destroy } = withHooks(() => tag(props || {}, ...children));

@@ -1,6 +1,6 @@
-import { Signal, effect } from "./signals";
-import { bind } from "./bind";
-import { withHooks, runHooks } from "./lifecycle";
+import { Signal, effect } from "./signals.js";
+import { bind } from "./bind.js";
+import { withHooks, runHooks } from "./lifecycle.js";
 
 export type AttrValue = string | number | boolean | (() => any) | Signal<any>;
 

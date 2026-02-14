@@ -1,0 +1,15 @@
+{
+  "name": "my-lumin-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "lumin dev",
+    "build": "lumin build",
+    "preview": "lumin preview"
+  },
+  "dependencies": {
+    "luminjs": "latest"
+  },
+  "sideEffects": false
+}

@@ -4,15 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "lumin dev",
+    "build": "lumin build",
     "preview": "vite preview"
   },
   "devDependencies": {
     "vite": "^5.0.0",
     "vite-plugin-lumin": "workspace:*",
-    "@luminjs/runtime": "workspace:*",
     "@luminjs/compiler": "workspace:*",
+    "luminjs": "workspace:*",
     "typescript": "^5.0.0"
   }
 }

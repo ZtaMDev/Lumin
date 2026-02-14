@@ -1,10 +1,14 @@
 {
-  "name": "@luminjs/runtime",
+  "name": "luminjs",
   "version": "0.1.0",
   "description": "The modular runtime for LuminJS",
+  "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "lumin": "./bin/lumin.js"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch"
@@ -13,15 +17,26 @@
     "luminjs",
     "runtime",
     "signals",
-    "framework"
+    "framework",
+    "framework-cli"
   ],
   "author": "LuminJS Team",
   "license": "MIT",
   "devDependencies": {
     "happy-dom": "^20.6.1",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "@types/node": "^25.2.3",
+    "@types/prompts": "^2.4.9",
+    "@types/fs-extra": "^11.0.4"
   },
   "dependencies": {
-    "@types/bun": "^1.3.9"
+    "@types/bun": "^1.3.9",
+    "vite": "^7.3.1",
+    "commander": "^12.0.0",
+    "prompts": "^2.4.2",
+    "picocolors": "^1.0.0",
+    "bundle-require": "^5.0.0",
+    "vite-plugin-lumin": "workspace:*",
+    "fs-extra": "^11.2.0"
   }
 }

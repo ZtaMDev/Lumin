@@ -1,4 +1,4 @@
-import { effect } from "./signals";
+import { effect } from "./signals.js";
 // ─── Core bind helper ──────────────────────────────────────
 function setupBind(el, sig, domProp, event, transform) {
     // Signal → DOM

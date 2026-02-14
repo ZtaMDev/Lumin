@@ -1,4 +1,4 @@
-import { Signal, Unsubscribe } from "./signals";
+import { Signal, Unsubscribe } from "./signals.js";
 export type StoreListener<T> = (state: T, key?: string) => void;
 export interface Store<T extends Record<string, any>> {
     /** Read a key reactively */
