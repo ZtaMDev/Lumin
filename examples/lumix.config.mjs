@@ -13,5 +13,6 @@ export default defineConfig({
     link: [{ rel: "icon", href: "/favicon.ico" }],
   },
   rootId: "app",
+  rootComponent: "/LayoutDemo.lumix",
   checkTypes: false,
 });

@@ -5,6 +5,7 @@ import { loadConfig, findConfigPath } from "./loader.js";
 import path from "path";
 import fs from "fs";
 import { __dirname } from "./utils.js";
+import { VERSION } from "./constants.js";
 
 async function startServer(cwd: string) {
   const config = await loadConfig(cwd);
@@ -35,7 +36,7 @@ export async function dev() {
   const cwd = process.cwd();
 
   console.log("");
-  console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim("v0.1.0")}`);
+  console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim(`v${VERSION}`)}`);
   console.log(pc.dim("  Starting development server...\n"));
 
   try {

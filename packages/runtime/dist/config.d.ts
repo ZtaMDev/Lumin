@@ -20,6 +20,11 @@ export interface LuminConfig {
      */
     rootId?: string;
     /**
+     * Optional path (Vite id) of the root .lumix component for HMR.
+     * Example: "/LayoutDemo.lumix" or "/src/App.lumix".
+     */
+    rootComponent?: string;
+    /**
      * Vite specific configuration overrides.
      */
     vite?: any;

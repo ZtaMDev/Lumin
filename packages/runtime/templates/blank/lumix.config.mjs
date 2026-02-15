@@ -7,4 +7,7 @@ export default defineConfig({
       { name: "description", content: "A beautiful app built with LuminJS" },
     ],
   },
+  rootId: "app",
+  rootComponent: "/src/App.lumix",
+  checkTypes: false,
 });

@@ -4,13 +4,14 @@ import pc from "picocolors";
 import { loadConfig } from "./loader.js";
 import path from "path";
 import { __dirname } from "./utils.js";
+import { VERSION } from "./constants.js";
 
 export async function preview() {
   const cwd = process.cwd();
   const config = await loadConfig(cwd);
 
   console.log("");
-  console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim("v0.1.0")}`);
+  console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim(`v${VERSION}`)}`);
   console.log(pc.dim("  Previewing production build...\n"));
 
   try {

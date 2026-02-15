@@ -4,6 +4,7 @@ import fs from "fs-extra";
 import path from "path";
 import { __dirname } from "./utils.js";
 import { spawnSync } from "child_process";
+import { VERSION } from "./constants.js";
 function isPackageManagerAvailable(pm) {
     try {
         let res = spawnSync(pm, ["--version"], { stdio: "ignore" });
@@ -86,7 +87,7 @@ function getInstallFailure(e) {
 }
 export async function init(name, options) {
     console.log("");
-    console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim("v0.1.0")}`);
+    console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim(`v${VERSION}`)}`);
     console.log(pc.dim("  Scaffolding a new project...\n"));
     const templates = [
         { title: "Blank", value: "blank" },

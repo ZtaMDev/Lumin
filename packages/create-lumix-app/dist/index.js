@@ -4,6 +4,7 @@ import fs from "fs-extra";
 import path from "path";
 import { createRequire } from "module";
 import { spawnSync } from "child_process";
+const VERSION = "0.1.3";
 function isPackageManagerAvailable(pm) {
     try {
         let res = spawnSync(pm, ["--version"], { stdio: "ignore" });
@@ -99,7 +100,7 @@ function getLumixRuntimeTemplatesDir() {
 }
 export async function createLumixApp(name, options) {
     console.log("");
-    console.log(`  ${pc.bold(pc.cyan("⚡ Create Lumix App"))} ${pc.dim("v0.1.0")}`);
+    console.log(`  ${pc.bold(pc.cyan("⚡ Create Lumix App"))} ${pc.dim(VERSION)}`);
     console.log(pc.dim("  Scaffolding a new project...\n"));
     const templates = getTemplates();
     const allowedTemplates = new Set(templates.filter((t) => !t.disabled).map((t) => t.value));

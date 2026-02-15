@@ -5,6 +5,7 @@ import path from "path";
 import { createRequire } from "module";
 import { spawnSync } from "child_process";
 
+const VERSION = "0.1.3";
 type TemplateChoice = {
   title: string;
   value: string;
@@ -123,7 +124,7 @@ function getLumixRuntimeTemplatesDir(): string {
 
 export async function createLumixApp(name?: string, options?: CreateOptions) {
   console.log("");
-  console.log(`  ${pc.bold(pc.cyan("⚡ Create Lumix App"))} ${pc.dim("v0.1.3")}`);
+  console.log(`  ${pc.bold(pc.cyan("⚡ Create Lumix App"))} ${pc.dim(VERSION)}`);
   console.log(pc.dim("  Scaffolding a new project...\n"));
 
   const templates = getTemplates();

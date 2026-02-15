@@ -1,6 +1,6 @@
 {
   "name": "lumix-js",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "The modular runtime for LumixJS",
   "type": "module",
   "main": "dist/index.js",

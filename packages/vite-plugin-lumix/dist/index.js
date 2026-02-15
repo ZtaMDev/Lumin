@@ -28,7 +28,7 @@ export default function lumix(config) {
                     const normalizedId = normalizePath(id);
                     const normalizedRoot = configuredRoot
                         ? normalizePath(configuredRoot)
-                        : "/LayoutDemo.lumix";
+                        : "/src/App.lumix";
                     const isRootModule = normalizedId.endsWith(normalizedRoot);
                     js += `\n\nif (import.meta.hot) {\n`;
                     js += `  globalThis.__lumix_hmr ||= { rootId: ${JSON.stringify(rootId)}, rootModuleId: null, ping: null, _t: null, _busy: false };\n`;

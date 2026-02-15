@@ -6,6 +6,7 @@ const VALID_KEYS = new Set([
     "vite",
     "srcDir",
     "checkTypes",
+    "rootComponent",
 ]);
 /**
  * Helper function to provide types for the LuminJS config.
@@ -14,8 +15,8 @@ const VALID_KEYS = new Set([
 export function defineConfig(config) {
     const unknown = Object.keys(config).filter((k) => !VALID_KEYS.has(k));
     if (unknown.length > 0) {
-        console.warn(`\x1b[33m[lumin] Warning: Unknown config field(s): ${unknown.map((k) => `"${k}"`).join(", ")}.\x1b[0m`);
-        console.warn(`\x1b[33m[lumin] Valid fields are: ${[...VALID_KEYS].join(", ")}.\x1b[0m`);
+        console.warn(`\x1b[33m[lumix] Warning: Unknown config field(s): ${unknown.map((k) => `"${k}"`).join(", ")}.\x1b[0m`);
+        console.warn(`\x1b[33m[lumix] Valid fields are: ${[...VALID_KEYS].join(", ")}.\x1b[0m`);
     }
     return config;
 }
