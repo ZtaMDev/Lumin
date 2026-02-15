@@ -1,6 +1,6 @@
 {
   "name": "create-lumix",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "bin": {
     "create-lumix": "./bin/create-lumix.js"
@@ -14,7 +14,7 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "lumix-js": "workspace:*",
+    "lumix-js": "latest",
     "fs-extra": "^11.2.0",
     "picocolors": "^1.0.0",
     "prompts": "^2.4.2"
