@@ -18,14 +18,16 @@ export function h(
       tag(props || {}, ...children),
     );
 
-    // If it's a component that returns a single element, we can attach hooks to it
-    if (result instanceof HTMLElement) {
-      if (mount.length > 0) {
-        // Simple trick: use MutationObserver or just run on next tick if added
-        setTimeout(() => runHooks(mount), 0);
-      }
-      if (destroy.length > 0) {
-        (result as any)._luminDestroy = destroy;
+    // Attach hooks for single element or Fragment(array) roots.
+    const roots = Array.isArray(result) ? result : [result];
+    for (const r of roots) {
+      if (r instanceof HTMLElement) {
+        if (mount.length > 0) {
+          setTimeout(() => runHooks(mount), 0);
+        }
+        if (destroy.length > 0) {
+          (r as any)._luminDestroy = destroy;
+        }
       }
     }
     return result;
@@ -155,10 +157,67 @@ function unmount(node: Node) {
 
 export function hydrate(
   root: HTMLElement,
-  component: (props?: any) => HTMLElement,
+  component: (props?: any) => any,
   props?: any,
 ) {
   while (root.firstChild) root.removeChild(root.firstChild);
-  const el = h(component, props || {});
-  root.appendChild(el);
+  const out = h(component, props || {});
+  const nodes = Array.isArray(out) ? out : [out];
+  for (const n of nodes) {
+    if (n === null || n === undefined) continue;
+    if (n instanceof Node) root.appendChild(n);
+    else root.appendChild(document.createTextNode(String(n)));
+  }
+}
+
+export function mount(
+  root: HTMLElement,
+  component: (props?: any) => any,
+  props?: any,
+) {
+  const start = document.createComment("lumix-root-start");
+  const end = document.createComment("lumix-root-end");
+
+  while (root.firstChild) root.removeChild(root.firstChild);
+  root.appendChild(start);
+  root.appendChild(end);
+
+  let currentNodes: Node[] = [];
+  let currentComponent = component;
+  let currentProps = props;
+
+  const render = () => {
+    for (const node of currentNodes) {
+      unmount(node);
+      if (node.parentNode) node.parentNode.removeChild(node);
+    }
+    currentNodes = [];
+
+    const out = h(currentComponent, currentProps || {});
+    const nodes = Array.isArray(out) ? out : [out];
+    for (const n of nodes) {
+      if (n === null || n === undefined) continue;
+      const node = n instanceof Node ? n : document.createTextNode(String(n));
+      root.insertBefore(node, end);
+      currentNodes.push(node);
+    }
+  };
+
+  render();
+
+  return {
+    update(nextComponent: (props?: any) => any) {
+      currentComponent = nextComponent;
+      render();
+    },
+    destroy() {
+      for (const node of currentNodes) {
+        unmount(node);
+        if (node.parentNode) node.parentNode.removeChild(node);
+      }
+      currentNodes = [];
+      if (start.parentNode) start.parentNode.removeChild(start);
+      if (end.parentNode) end.parentNode.removeChild(end);
+    },
+  };
 }

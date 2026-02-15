@@ -1,4 +1,7 @@
 import { compile } from "@lumix-js/compiler";
+function normalizePath(p) {
+    return p.replace(/\\/g, "/");
+}
 export default function lumix(config) {
     let isBuild = false;
     return {
@@ -16,20 +19,49 @@ export default function lumix(config) {
                     bundle: false,
                     checkTypes: config?.checkTypes,
                 });
-                // Basic HMR: accept updates for this .lumix module and re-hydrate.
-                // Assumptions:
-                // - The compiled module has a default export: the component factory.
-                // - The app entry uses lumix-js `hydrate(root, App)`.
+                // HMR: keep it safe in ESM.
+                // We avoid auto-mounting at module evaluation time (it can clear the app multiple times).
+                // Instead, on update we re-hydrate the app root with the updated module.
                 if (!isBuild) {
                     const rootId = config?.rootId || "app";
+                    const configuredRoot = config?.rootComponent;
+                    const normalizedId = normalizePath(id);
+                    const normalizedRoot = configuredRoot
+                        ? normalizePath(configuredRoot)
+                        : "/LayoutDemo.lumix";
+                    const isRootModule = normalizedId.endsWith(normalizedRoot);
                     js += `\n\nif (import.meta.hot) {\n`;
+                    js += `  globalThis.__lumix_hmr ||= { rootId: ${JSON.stringify(rootId)}, rootModuleId: null, ping: null, _t: null, _busy: false };\n`;
+                    js += `  if (${isRootModule ? "true" : "false"}) {\n`;
+                    js += `    // Store the root module id (Vite specifier) so we can re-import it with cache-busting on child updates.\n`;
+                    js += `    globalThis.__lumix_hmr.rootModuleId = "/@fs/" + ${JSON.stringify(normalizedId)};\n`;
+                    js += `    globalThis.__lumix_hmr.ping ||= () => {\n`;
+                    js += `      try {\n`;
+                    js += `        if (globalThis.__lumix_hmr._busy) return;\n`;
+                    js += `        const rootEl = document.getElementById(globalThis.__lumix_hmr.rootId);\n`;
+                    js += `        if (!rootEl) return;\n`;
+                    js += `        const mid = globalThis.__lumix_hmr.rootModuleId;\n`;
+                    js += `        if (!mid) return;\n`;
+                    js += `        globalThis.__lumix_hmr._busy = true;\n`;
+                    js += `        // Force fresh evaluation of the root module so updated child imports are picked up.\n`;
+                    js += `        import(/* @vite-ignore */ (mid + '?t=' + Date.now())).then((m2) => {\n`;
+                    js += `          const comp = (m2 && m2.default) ? m2.default : null;\n`;
+                    js += `          if (!comp) return;\n`;
+                    js += `          import(\"lumix-js\").then(({ hydrate }) => hydrate(rootEl, comp));\n`;
+                    js += `        }).finally(() => { globalThis.__lumix_hmr._busy = false; });\n`;
+                    js += `      } catch (e) {}\n`;
+                    js += `    };\n`;
+                    js += `  }\n`;
                     js += `  import.meta.hot.accept((m) => {\n`;
                     js += `    try {\n`;
-                    js += `      const root = document.getElementById(${JSON.stringify(rootId)});\n`;
-                    js += `      if (!root) { import.meta.hot.invalidate(); return; }\n`;
-                    js += `      import(\"lumix-js\").then(({ hydrate }) => {\n`;
-                    js += `        hydrate(root, (m && m.default) ? m.default : (module.exports && module.exports.default));\n`;
-                    js += `      });\n`;
+                    js += `      // If root updated, refresh the stored root URL.\n`;
+                    js += `      if (${isRootModule ? "true" : "false"}) {\n`;
+                    js += `        globalThis.__lumix_hmr.rootModuleId = "/@fs/" + ${JSON.stringify(normalizedId)};\n`;
+                    js += `      }\n`;
+                    js += `      if (globalThis.__lumix_hmr && globalThis.__lumix_hmr.ping) {\n`;
+                    js += `        clearTimeout(globalThis.__lumix_hmr._t);\n`;
+                    js += `        globalThis.__lumix_hmr._t = setTimeout(() => globalThis.__lumix_hmr.ping(), 25);\n`;
+                    js += `      }\n`;
                     js += `    } catch (e) {\n`;
                     js += `      console.error('[lumix-hmr] failed to apply update', e);\n`;
                     js += `      import.meta.hot.invalidate();\n`;

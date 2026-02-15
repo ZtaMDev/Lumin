@@ -129,18 +129,18 @@ fn generate_component_body(component: &ComponentFile, is_esm: bool, script_body:
 
     out.push_str("  return ");
     if component.template.len() == 1 {
+        // Single root: return that node directly.
         out.push_str(&generate_node_h(&component.template[0], 2, !is_esm, false));
     } else {
-        out.push_str("__LUMIX__.h('div', null, [\n");
+        // Multiple roots: use Fragment so we don't introduce an extra wrapper div.
+        out.push_str("__LUMIX__.h(__LUMIX__.Fragment, null, ");
         for (i, node) in component.template.iter().enumerate() {
-            out.push_str("    ");
-            out.push_str(&generate_node_h(node, 4, !is_esm, false));
-            if i < component.template.len() - 1 {
-                out.push(',');
+            if i > 0 {
+                out.push_str(", ");
             }
-            out.push('\n');
+            out.push_str(&generate_node_h(node, 2, !is_esm, false));
         }
-        out.push_str("  ])");
+        out.push_str(")");
     }
     out.push_str(";\n");
     out.push_str("}\n");
@@ -149,6 +149,10 @@ fn generate_component_body(component: &ComponentFile, is_esm: bool, script_body:
         out.push_str(&format!("export default {};\n", fn_name));
         out.push_str(&format!("export {{ {} }};\n", fn_name));
     }
+
+    // HMR helper: expose the component factory as a stable binding.
+    // The Vite plugin uses this to capture the root component at runtime.
+    out.push_str(&format!("const __LUMIX_ROOT__ = {};\n", fn_name));
 
     out
 }
@@ -330,7 +334,14 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool, strip_sl
                             s.push_str(&format!("'{}': '{}'", name, escape_backticks(value)));
                         }
                         AttributeNode::Dynamic { name, expr } => {
-                            s.push_str(&format!("'{}': () => ({})", name, transpile_ts_snippet(&expr.code).trim()));
+                            // Wrap to auto-unwrap signals/functions for common reactive values.
+                            // This makes `value={name}` behave like `value={name()}` when `name` is a Signal.
+                            let t = transpile_ts_snippet(&expr.code);
+                            let e = t.trim();
+                            s.push_str(&format!(
+                                "'{}': () => {{ const __v = ({}); return (typeof __v === 'function') ? __v() : __v; }}",
+                                name, e
+                            ));
                         }
                         AttributeNode::EventHandler { name, expr } => {
                             s.push_str(&format!("'{}': {}", name, transpile_ts_snippet(&expr.code).trim()));

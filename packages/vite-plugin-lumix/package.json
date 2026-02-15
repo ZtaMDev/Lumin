@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-lumix",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Vite plugin for LuminJS",
   "type": "module",
   "main": "dist/index.js",
@@ -18,7 +18,7 @@
     "vite",
     "plugin"
   ],
-  "author": "LuminJS Team",
+  "author": "ZMDev",
   "license": "MIT",
   "peerDependencies": {
     "vite": "^5.0.0"

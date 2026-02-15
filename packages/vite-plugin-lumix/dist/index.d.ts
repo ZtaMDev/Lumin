@@ -7,6 +7,7 @@ interface LumixConfig {
         script?: Array<Record<string, string>>;
     };
     rootId?: string;
+    rootComponent?: string;
     vite?: any;
     srcDir?: string;
     [key: string]: any;

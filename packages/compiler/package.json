@@ -1,6 +1,6 @@
 {
   "name": "@lumix-js/compiler",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The high-performance LumixJS compiler",
   "type": "module",
   "main": "dist/index.js",
@@ -22,7 +22,7 @@
     "compiler",
     "rust"
   ],
-  "author": "LuminJS Team",
+  "author": "ZMDev",
   "license": "MIT",
   "dependencies": {
     "execa": "^5.0.0",
