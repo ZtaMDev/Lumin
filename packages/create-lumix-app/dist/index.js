@@ -4,7 +4,7 @@ import fs from "fs-extra";
 import path from "path";
 import { createRequire } from "module";
 import { spawnSync } from "child_process";
-const VERSION = "0.1.3";
+const VERSION = "0.1.4";
 function isPackageManagerAvailable(pm) {
     try {
         let res = spawnSync(pm, ["--version"], { stdio: "ignore" });

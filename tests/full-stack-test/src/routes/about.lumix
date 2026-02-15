@@ -1,0 +1,81 @@
+<script>
+  "use server"; // Directiva para SSR - renderizado dinámico en el servidor
+  
+  import { signal } from "lumix-js";
+  
+  // Server-side data (would come from server context in real SSR)
+  const serverTime = new Date().toISOString();
+  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Server-Side';
+  
+  // Client-side interactivity
+  const count = signal(0);
+</script>
+
+<div class="page">
+  <h1>About (Server-Side)</h1>
+  <p>This page uses <code>"use server"</code> directive for SSR.</p>
+  <p>Server timestamp: <strong>{serverTime}</strong></p>
+  <p>User agent: <strong>{userAgent}</strong></p>
+  <p>Interactive counter: <span>{count()}</span></p>
+  <button onclick={() => count(count() + 1)}>Increment</button>
+  
+  <nav class="nav">
+    <a href="/">← Back to Home</a>
+  </nav>
+</div>
+
+<style>
+  .page { 
+    padding: 2rem; 
+    font-family: system-ui, sans-serif; 
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  
+  h1 { 
+    color: #059669; 
+  }
+  
+  .nav {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: #f0fdf4;
+    border-radius: 8px;
+  }
+  
+  .nav a {
+    color: #059669;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .nav a:hover {
+    text-decoration: underline;
+  }
+  
+  button {
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    background: #059669;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  
+  strong {
+    color: #059669;
+  }
+  
+  span {
+    font-weight: bold;
+    color: #059669;
+  }
+  
+  code {
+    background: #f0fdf4;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    color: #059669;
+  }
+</style>

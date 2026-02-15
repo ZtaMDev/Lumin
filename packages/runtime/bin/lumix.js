@@ -5,8 +5,9 @@ import { dev } from "../dist/cli/dev.js";
 import { build } from "../dist/cli/build.js";
 import { preview } from "../dist/cli/preview.js";
 import { init } from "../dist/cli/init.js";
+import { add } from "../dist/cli/add.js";
 
-const VERSION = "0.1.3";
+const VERSION = "0.1.4";
 
 const program = new Command();
 
@@ -31,8 +32,13 @@ program
   .command("init")
   .description("Scaffold a new LuminJS project")
   .argument("[name]", "Project name")
-  .option("-t, --template <template>", "Project template (blank, blank-ts)")
+  .option("-t, --template <template>", "Project template (blank, blank-ts, full-stack-app)")
   .action((name, options) => init(name, options));
+
+program
+  .command("add <integration>")
+  .description("Add an integration (e.g. tailwind)")
+  .action(add);
 
 // Custom help output
 program.configureHelp({

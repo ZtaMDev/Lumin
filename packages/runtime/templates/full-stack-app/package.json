@@ -1,0 +1,18 @@
+{
+  "name": "my-lumix-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "lumix dev",
+    "build": "lumix build",
+    "preview": "lumix preview"
+  },
+  "dependencies": {
+    "lumix-js": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vite-plugin-lumix": "latest"
+  }
+}

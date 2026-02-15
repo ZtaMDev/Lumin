@@ -92,6 +92,7 @@ export async function init(name, options) {
     const templates = [
         { title: "Blank", value: "blank" },
         { title: "Blank (TypeScript)", value: "blank-ts" },
+        { title: "Full-stack app (meta-framework)", value: "full-stack-app" },
         { title: "Sitemap (Coming soon...)", value: "sitemap", disabled: true },
     ];
     const allowedTemplates = new Set(templates

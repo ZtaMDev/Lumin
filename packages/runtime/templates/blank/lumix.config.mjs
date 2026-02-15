@@ -8,6 +8,5 @@ export default defineConfig({
     ],
   },
   rootId: "app",
-  rootComponent: "/src/App.lumix",
   checkTypes: false,
 });

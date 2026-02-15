@@ -7,6 +7,9 @@ const VALID_KEYS = new Set([
     "srcDir",
     "checkTypes",
     "rootComponent",
+    "mode",
+    "router",
+    "ssg",
 ]);
 /**
  * Helper function to provide types for the LuminJS config.

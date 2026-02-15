@@ -109,6 +109,7 @@ export async function init(name?: string, options?: InitOptions) {
   const templates = [
     { title: "Blank", value: "blank" },
     { title: "Blank (TypeScript)", value: "blank-ts" },
+    { title: "Full-stack app (meta-framework)", value: "full-stack-app" },
     { title: "Sitemap (Coming soon...)", value: "sitemap", disabled: true },
   ] as const;
 

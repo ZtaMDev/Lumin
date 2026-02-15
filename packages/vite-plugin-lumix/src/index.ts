@@ -1,4 +1,6 @@
 import { compile } from "@lumix-js/compiler";
+import path from "path";
+import fs from "fs";
 
 interface LumixConfig {
   title?: string;
@@ -12,6 +14,7 @@ interface LumixConfig {
   rootComponent?: string;
   vite?: any;
   srcDir?: string;
+  router?: { pagesDir?: string; apiDir?: string };
   [key: string]: any;
 }
 
@@ -19,14 +22,102 @@ function normalizePath(p: string): string {
   return p.replace(/\\/g, "/");
 }
 
+const ROUTES_VIRTUAL_ID = "virtual:lumix/routes";
+const ROUTES_GENERATED_FILE = ".lumix/routes.mjs";
+
+function scanRoutes(root: string, pagesDir: string): Array<{ path: string; file: string }> {
+  const dir = path.join(root, pagesDir);
+  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return [];
+  const routes: Array<{ path: string; file: string }> = [];
+  function walk(dirPath: string, prefix: string[]) {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const e of entries) {
+      const rel = [...prefix, e.name];
+      if (e.isDirectory()) walk(path.join(dirPath, e.name), rel);
+      else if (e.name.endsWith(".lumix")) {
+        const segs = rel
+          .slice(0, -1)
+          .concat(path.basename(e.name, ".lumix"))
+          .map((s) => s.replace(/^\[([^\]]+)\]$/, ":$1"));
+        const pathSegs = segs[segs.length - 1] === "index" ? segs.slice(0, -1) : segs;
+        const routePath = "/" + pathSegs.join("/") || "/";
+        const filePath = "/" + path.join(pagesDir, ...rel).replace(/\\/g, "/");
+        routes.push({ path: routePath, file: filePath });
+      }
+    }
+  }
+  walk(dir, []);
+  return routes.sort((a, b) => (a.path === "/" ? -1 : b.path === "/" ? 1 : a.path.localeCompare(b.path)));
+}
+
+function writeRoutesFile(root: string, pagesDir: string): string {
+  const routes = scanRoutes(root, pagesDir);
+  const outDir = path.join(root, ".lumix");
+  const outPath = path.join(outDir, "routes.mjs");
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(outPath, `export const routes = ${JSON.stringify(routes)};\n`, "utf8");
+  return outPath;
+}
+
 export default function lumix(config?: LumixConfig) {
   let isBuild = false;
+  let resolvedRoot: string = "";
+  let routesFilePath: string = "";
+  /** Resolved main entry module id for HMR (e.g. "/main.ts"). No rootComponent needed. */
+  let mainEntryId: string | null = null;
 
   return {
     name: "vite-plugin-lumix",
     enforce: "pre" as const,
+    config(viteConfig: any) {
+      const root = viteConfig?.root ?? process.cwd();
+      const pagesDir = config?.router?.pagesDir ?? path.join(config?.srcDir ?? "src", "routes");
+      const outPath = writeRoutesFile(root, pagesDir);
+      const existing = viteConfig?.resolve?.alias;
+      const existingArr = Array.isArray(existing)
+        ? existing
+        : existing && typeof existing === "object"
+          ? Object.entries(existing).map(([find, replacement]) => ({ find, replacement }))
+          : [];
+      return {
+        resolve: {
+          alias: [
+            ...existingArr,
+            { find: "virtual:lumix/routes", replacement: outPath },
+            { find: ".lumix/routes", replacement: outPath },
+          ],
+        },
+      };
+    },
     configResolved(resolvedConfig: any) {
+      resolvedRoot = resolvedConfig.root;
       isBuild = resolvedConfig.command === "build";
+      const pagesDir = config?.router?.pagesDir ?? path.join(config?.srcDir ?? "src", "routes");
+      routesFilePath = writeRoutesFile(resolvedRoot, pagesDir);
+      if (!isBuild) {
+        const root = resolvedConfig.root;
+        const srcDir = config?.srcDir ?? ".";
+        const base = path.join(root, srcDir);
+        if (fs.existsSync(path.join(base, "main.ts")))
+          mainEntryId = "/" + path.join(srcDir, "main.ts").replace(/\\/g, "/");
+        else if (fs.existsSync(path.join(base, "main.js")))
+          mainEntryId = "/" + path.join(srcDir, "main.js").replace(/\\/g, "/");
+        else if (fs.existsSync(path.join(root, "main.ts")))
+          mainEntryId = "/main.ts";
+        else if (fs.existsSync(path.join(root, "main.js")))
+          mainEntryId = "/main.js";
+      }
+    },
+
+    buildStart(this: any) {
+      const root = this.config?.root ?? process.cwd();
+      const pagesDir = config?.router?.pagesDir ?? path.join(config?.srcDir ?? "src", "routes");
+      writeRoutesFile(root, pagesDir);
+    },
+
+    resolveId(id: string) {
+      if (id === ROUTES_VIRTUAL_ID && routesFilePath) return routesFilePath;
+      return null;
     },
 
     async transform(this: any, code: string, id: string) {
@@ -39,49 +130,13 @@ export default function lumix(config?: LumixConfig) {
           checkTypes: config?.checkTypes,
         });
 
-        // HMR: keep it safe in ESM.
-        // We avoid auto-mounting at module evaluation time (it can clear the app multiple times).
-        // Instead, on update we re-hydrate the app root with the updated module.
-        if (!isBuild) {
-          const rootId = config?.rootId || "app";
-          const configuredRoot = config?.rootComponent;
-          const normalizedId = normalizePath(id);
-          const normalizedRoot = configuredRoot
-            ? normalizePath(configuredRoot)
-            : "/src/App.lumix";
-          const isRootModule = normalizedId.endsWith(normalizedRoot);
+        // HMR: on any .lumix update, re-import the main entry so it re-runs and re-hydrates with updated components.
+        // No rootComponent config needed — the entry (main.ts/js) already calls hydrate(root, App).
+        if (!isBuild && mainEntryId) {
           js += `\n\nif (import.meta.hot) {\n`;
-          js += `  globalThis.__lumix_hmr ||= { rootId: ${JSON.stringify(rootId)}, rootModuleId: null, ping: null, _t: null, _busy: false };\n`;
-          js += `  if (${isRootModule ? "true" : "false"}) {\n`;
-          js += `    // Store the root module id (Vite specifier) so we can re-import it with cache-busting on child updates.\n`;
-          js += `    globalThis.__lumix_hmr.rootModuleId = "/@fs/" + ${JSON.stringify(normalizedId)};\n`;
-          js += `    globalThis.__lumix_hmr.ping ||= () => {\n`;
-          js += `      try {\n`;
-          js += `        if (globalThis.__lumix_hmr._busy) return;\n`;
-          js += `        const rootEl = document.getElementById(globalThis.__lumix_hmr.rootId);\n`;
-          js += `        if (!rootEl) return;\n`;
-          js += `        const mid = globalThis.__lumix_hmr.rootModuleId;\n`;
-          js += `        if (!mid) return;\n`;
-          js += `        globalThis.__lumix_hmr._busy = true;\n`;
-          js += `        // Force fresh evaluation of the root module so updated child imports are picked up.\n`;
-          js += `        import(/* @vite-ignore */ (mid + '?t=' + Date.now())).then((m2) => {\n`;
-          js += `          const comp = (m2 && m2.default) ? m2.default : null;\n`;
-          js += `          if (!comp) return;\n`;
-          js += `          import(\"lumix-js\").then(({ hydrate }) => hydrate(rootEl, comp));\n`;
-          js += `        }).finally(() => { globalThis.__lumix_hmr._busy = false; });\n`;
-          js += `      } catch (e) {}\n`;
-          js += `    };\n`;
-          js += `  }\n`;
           js += `  import.meta.hot.accept((m) => {\n`;
           js += `    try {\n`;
-          js += `      // If root updated, refresh the stored root URL.\n`;
-          js += `      if (${isRootModule ? "true" : "false"}) {\n`;
-          js += `        globalThis.__lumix_hmr.rootModuleId = "/@fs/" + ${JSON.stringify(normalizedId)};\n`;
-          js += `      }\n`;
-          js += `      if (globalThis.__lumix_hmr && globalThis.__lumix_hmr.ping) {\n`;
-          js += `        clearTimeout(globalThis.__lumix_hmr._t);\n`;
-          js += `        globalThis.__lumix_hmr._t = setTimeout(() => globalThis.__lumix_hmr.ping(), 25);\n`;
-          js += `      }\n`;
+          js += `      import(/* @vite-ignore */ ${JSON.stringify(mainEntryId)} + '?t=' + Date.now()).then(() => {}).catch(() => {});\n`;
           js += `    } catch (e) {\n`;
           js += `      console.error('[lumix-hmr] failed to apply update', e);\n`;
           js += `      import.meta.hot.invalidate();\n`;
@@ -206,7 +261,18 @@ export default function lumix(config?: LumixConfig) {
     },
 
     configureServer(server: any) {
+      const pagesDir = config?.router?.pagesDir ?? path.join(config?.srcDir ?? "src", "routes");
       return () => {
+        const watcher = server?.watcher;
+        if (watcher && resolvedRoot) {
+          const routesDir = path.join(resolvedRoot, pagesDir);
+          if (fs.existsSync(routesDir)) {
+            watcher.on("change", (file: string) => {
+              if (file.endsWith(".lumix")) writeRoutesFile(resolvedRoot, pagesDir);
+            });
+            watcher.add(routesDir);
+          }
+        }
         server.middlewares.use(async (req: any, res: any, next: any) => {
           const url = req.url || "";
           if (url === "/" || url === "/index.html") {

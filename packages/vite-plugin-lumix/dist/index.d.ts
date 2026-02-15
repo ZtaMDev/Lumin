@@ -10,12 +10,23 @@ interface LumixConfig {
     rootComponent?: string;
     vite?: any;
     srcDir?: string;
+    router?: {
+        pagesDir?: string;
+        apiDir?: string;
+    };
     [key: string]: any;
 }
 export default function lumix(config?: LumixConfig): {
     name: string;
     enforce: "pre";
+    config(viteConfig: any): {
+        resolve: {
+            alias: any[];
+        };
+    };
     configResolved(resolvedConfig: any): void;
+    buildStart(this: any): void;
+    resolveId(id: string): string | null;
     transform(this: any, code: string, id: string): Promise<{
         code: string;
         map: null;

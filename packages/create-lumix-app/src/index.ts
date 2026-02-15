@@ -5,7 +5,7 @@ import path from "path";
 import { createRequire } from "module";
 import { spawnSync } from "child_process";
 
-const VERSION = "0.1.3";
+const VERSION = "0.1.4";
 type TemplateChoice = {
   title: string;
   value: string;

@@ -221,3 +221,151 @@ export function mount(
     },
   };
 }
+
+// ─── SSG / Islands (plan: meta-framework) ───────────────────
+
+export interface IslandDescriptor {
+  id: string;
+  componentPath: string;
+  props: any;
+  selector: string;
+}
+
+export interface RenderToStringResult {
+  html: string;
+  islands: IslandDescriptor[];
+  styles?: string[];
+}
+
+/**
+ * Render a Lumix component to HTML (for SSG/SSR).
+ * Requires a DOM implementation (e.g. happy-dom in Node).
+ * Islands are marked for later hydration; full island detection is TODO.
+ * Captures styles injected during rendering for SSG.
+ */
+export function renderToString(
+  Comp: (props?: any) => any,
+  props?: any,
+): RenderToStringResult {
+  if (typeof document === "undefined" || !document.createElement) {
+    throw new Error(
+      "[lumix] renderToString requires a DOM (e.g. use happy-dom in Node)",
+    );
+  }
+
+  // Capture styles injected during rendering
+  const capturedStyles: string[] = [];
+  const detectedIslands: IslandDescriptor[] = [];
+  let islandCounter = 0;
+  
+  const originalCreateElement = document.createElement.bind(document);
+  const originalAppendChild = document.head.appendChild.bind(document.head);
+
+  // Override createElement to capture style elements and detect islands
+  document.createElement = function(tagName: string) {
+    const element = originalCreateElement(tagName);
+    
+    if (tagName.toLowerCase() === 'style') {
+      // Override the textContent setter to capture style content
+      let styleContent = '';
+      Object.defineProperty(element, 'textContent', {
+        get() { return styleContent; },
+        set(value: string) {
+          styleContent = value;
+          // Store the style content for later inclusion in HTML
+          if (value && !capturedStyles.includes(value)) {
+            capturedStyles.push(value);
+          }
+        }
+      });
+    }
+    
+    return element;
+  } as any;
+
+  // Override appendChild to capture when styles are added to head
+  document.head.appendChild = function(node: Node) {
+    if (node.nodeName === 'STYLE') {
+      const styleElement = node as HTMLStyleElement;
+      const content = styleElement.textContent;
+      if (content && !capturedStyles.includes(content)) {
+        capturedStyles.push(content);
+      }
+      // Don't actually append to head during SSR - we'll include in final HTML
+      return node;
+    }
+    return originalAppendChild(node);
+  } as any;
+
+  // Track if we're rendering an interactive component (has signals/effects)
+  let hasInteractivity = false;
+  const originalEffect = (globalThis as any).effect;
+  
+  // Override effect to detect interactivity
+  if (typeof originalEffect === 'function') {
+    (globalThis as any).effect = function(...args: any[]) {
+      hasInteractivity = true;
+      return originalEffect.apply(this, args);
+    };
+  }
+
+  try {
+    const container = document.createElement("div");
+    const out = h(Comp, props || {});
+    const nodes = Array.isArray(out) ? out : [out];
+    for (const n of nodes) {
+      if (n === null || n === undefined) continue;
+      if (n instanceof Node) container.appendChild(n);
+      else container.appendChild(document.createTextNode(String(n)));
+    }
+
+    let html = container.innerHTML;
+
+    // Remove any style tags from the rendered HTML since we'll include them in head
+    html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+
+    // If the component has interactivity, mark it as an island
+    if (hasInteractivity) {
+      const islandId = `lumix-island-${islandCounter++}`;
+      
+      // Wrap the HTML content with island markers
+      html = `<div data-lumix-island="${islandId}" data-lumix-component="${Comp.name || 'Component'}">${html}</div>`;
+      
+      detectedIslands.push({
+        id: islandId,
+        componentPath: '', // Will be filled by the build process
+        props: props || {},
+        selector: `[data-lumix-island="${islandId}"]`
+      });
+    }
+
+    return {
+      html,
+      islands: detectedIslands,
+      styles: capturedStyles,
+    };
+  } finally {
+    // Restore original functions
+    document.createElement = originalCreateElement;
+    document.head.appendChild = originalAppendChild;
+    
+    // Restore original effect
+    if (originalEffect) {
+      (globalThis as any).effect = originalEffect;
+    }
+  }
+}
+
+/**
+ * Hydrate a single island node (for use with window.__LUMIX_ISLANDS__).
+ */
+export async function hydrateIsland(
+  el: HTMLElement,
+  componentPath: string,
+  props: any,
+) {
+  const mod = await import(/* @vite-ignore */ componentPath);
+  const Comp = mod?.default;
+  if (!Comp) return;
+  hydrate(el, Comp, props);
+}

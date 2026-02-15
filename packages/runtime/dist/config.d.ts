@@ -37,6 +37,24 @@ export interface LuminConfig {
      * Defaults to true in TS projects, can be disabled for JS projects.
      */
     checkTypes?: boolean;
+    /**
+     * Meta-framework mode. Use "ssg" for the full-stack meta-framework template.
+     * Omit or use default for SPA (blank/blank-ts).
+     */
+    mode?: "spa" | "ssg";
+    /**
+     * File-based router config (used when mode is "vinxi-ssg").
+     */
+    router?: {
+        pagesDir?: string;
+        apiDir?: string;
+    };
+    /**
+     * SSG options (used when mode is "vinxi-ssg").
+     */
+    ssg?: {
+        enabled?: boolean;
+    };
     /** Allow extra keys without TS errors, but we'll warn at runtime */
     [key: string]: any;
 }
