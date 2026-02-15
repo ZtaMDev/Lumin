@@ -123,7 +123,7 @@ function getLumixRuntimeTemplatesDir(): string {
 
 export async function createLumixApp(name?: string, options?: CreateOptions) {
   console.log("");
-  console.log(`  ${pc.bold(pc.cyan("⚡ Create Lumix App"))} ${pc.dim("v0.1.0")}`);
+  console.log(`  ${pc.bold(pc.cyan("⚡ Create Lumix App"))} ${pc.dim("v0.1.3")}`);
   console.log(pc.dim("  Scaffolding a new project...\n"));
 
   const templates = getTemplates();

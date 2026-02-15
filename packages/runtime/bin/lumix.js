@@ -6,7 +6,7 @@ import { build } from "../dist/cli/build.js";
 import { preview } from "../dist/cli/preview.js";
 import { init } from "../dist/cli/init.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.3";
 
 const program = new Command();
 
