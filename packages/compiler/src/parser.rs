@@ -1,7 +1,6 @@
 use crate::ast::*;
 use crate::error::CompileError;
 use crate::diagnostic::SourceRange as DiagnosticSourceRange;
-use std::collections::HashMap;
 
 use swc_common::{FileName, SourceMap, DUMMY_SP, Spanned};
 use swc_ecma_ast::{ModuleDecl, ModuleItem, Decl, Pat, Callee};
@@ -356,7 +355,7 @@ fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<Scr
 }
 
 // Extract head metadata from an object literal expression
-fn extract_head_metadata(expr: &swc_ecma_ast::Expr, code: &str, fm: &swc_common::SourceFile) -> Option<HeadMetadata> {
+fn extract_head_metadata(expr: &swc_ecma_ast::Expr, _code: &str, _fm: &swc_common::SourceFile) -> Option<HeadMetadata> {
     use swc_ecma_ast::{Expr, Lit, PropOrSpread, Prop as SwcProp, KeyValueProp};
     use std::collections::HashMap;
     

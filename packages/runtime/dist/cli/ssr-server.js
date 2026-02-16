@@ -181,10 +181,10 @@ function createSSRMiddleware(cwd, config, viteServer, directives) {
                 try {
                     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
                     const possibleKeys = [
-                        `.lumix/entries/ssr-${safeName}.js`,
-                        `lumix/entries/ssr-${safeName}.js`,
-                        `entries/ssr-${safeName}.js`,
-                        `ssr-${safeName}.js`
+                        `.lumix/entries/${safeName}.js`,
+                        `lumix/entries/${safeName}.js`,
+                        `entries/${safeName}.js`,
+                        `${safeName}.js`
                     ];
                     for (const key of possibleKeys) {
                         if (manifest[key]) {
