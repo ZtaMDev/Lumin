@@ -3,7 +3,7 @@ import * as __LUMIX__ from 'lumix-js';
 import { signal } from "lumix-js";
 
 function about(props = {}) {
-  "use server";
+  "use static";
   const serverTime = new Date().toISOString();
   const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Server-Side';
   const count = signal(0);

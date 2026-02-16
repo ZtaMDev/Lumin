@@ -10,6 +10,7 @@ const VALID_KEYS = new Set([
   "mode",
   "router",
   "ssg",
+  "dev",
 ]);
 
 export interface LuminConfig {
@@ -78,6 +79,17 @@ export interface LuminConfig {
    */
   ssg?: {
     enabled?: boolean;
+  };
+
+  /**
+   * Development server options.
+   */
+  dev?: {
+    /**
+     * Show the dev indicator overlay with route info and rendering mode.
+     * Defaults to false.
+     */
+    showIndicator?: boolean;
   };
 
   /** Allow extra keys without TS errors, but we'll warn at runtime */

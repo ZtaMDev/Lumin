@@ -2,12 +2,25 @@
   "use static"; // Directiva para SSG - contenido completamente estático
   
   import { signal } from "lumix-js";
+  
+  // Este código se ejecuta UNA VEZ en build time
+  // El timestamp queda "congelado" en el HTML generado
+  const buildTime = new Date().toISOString();
+  
+  // Client-side interactivity - se hidrata en el cliente
   const count = signal(0);
 </script>
 
 <div class="page">
-  <h1>Lumix (Static)</h1>
+  <h1>Lumix (Static Site Generation)</h1>
   <p>Meta-framework template. Edit <code>src/routes/index.lumix</code>.</p>
+  
+  <div class="info">
+    <h3>SSG vs SSR:</h3>
+    <p><strong>Esta página (SSG):</strong> Generada una vez en build time. El timestamp NO cambia al recargar.</p>
+    <p>Build timestamp: <strong>{buildTime}</strong></p>
+    <p><em>Recarga la página varias veces - el timestamp permanece igual porque es estático.</em></p>
+  </div>
   
   <nav class="nav">
     <h3>Navigation:</h3>
@@ -16,8 +29,9 @@
   </nav>
   
   <div class="demo">
-    <p>Interactive counter (this is an island):</p>
+    <p>Interactive counter (island hidratada en cliente):</p>
     <button onclick={() => count(count() + 1)}>Count: {count()}</button>
+    <p><em>Este contador funciona porque se hidrata en el cliente, pero el HTML inicial es estático.</em></p>
   </div>
 </div>
 
@@ -30,6 +44,23 @@
   }
   
   h1 { color: #4f46e5; }
+  
+  .info {
+    margin: 2rem 0;
+    padding: 1rem;
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    border-radius: 4px;
+  }
+  
+  .info h3 {
+    margin-top: 0;
+    color: #92400e;
+  }
+  
+  .info strong {
+    color: #92400e;
+  }
   
   .nav {
     margin: 2rem 0;

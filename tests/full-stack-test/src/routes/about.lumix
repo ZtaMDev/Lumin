@@ -3,24 +3,26 @@
   
   import { signal } from "lumix-js";
   
-  // Server-side data (would come from server context in real SSR)
+  // Este código se ejecuta en CADA REQUEST del servidor
+  // Por eso el timestamp cambia en cada recarga
   const serverTime = new Date().toISOString();
   const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Server-Side';
   
-  // Client-side interactivity
+  // Client-side interactivity - se hidrata en el cliente
   const count = signal(0);
 </script>
 
 <div class="page">
-  <h1>About (Server-Side)</h1>
-  <p>This page uses <code>"use server"</code> directive for SSR.</p>
+  <h1>About (Server-Side Rendering)</h1>
+  <p>Esta página usa <code>"use server"</code> para SSR dinámico.</p>
+  <p><strong>Comportamiento SSR:</strong> El timestamp cambia en cada recarga porque se renderiza en el servidor en cada request.</p>
   <p>Server timestamp: <strong>{serverTime}</strong></p>
   <p>User agent: <strong>{userAgent}</strong></p>
-  <p>Interactive counter: <span>{count()}</span></p>
+  <p>Interactive counter (hidratado en cliente): <span>{count()}</span></p>
   <button onclick={() => count(count() + 1)}>Increment</button>
   
   <nav class="nav">
-    <a href="/">← Back to Home</a>
+    <a href="/">← Volver a Home (Static)</a>
   </nav>
 </div>
 

@@ -12,4 +12,7 @@ export default defineConfig({
   head: {
     meta: [{ name: "description", content: "Lumix full-stack meta-framework" }],
   },
+  dev: {
+    showIndicator: true, // Enable dev indicator (drag & drop, hide/show)
+  },
 });

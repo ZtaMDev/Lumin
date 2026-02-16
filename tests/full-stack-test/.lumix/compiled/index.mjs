@@ -4,6 +4,7 @@ import { signal } from "lumix-js";
 
 function index(props = {}) {
   "use static";
+  const buildTime = new Date().toISOString();
   const count = signal(0);
 
   // Styles
@@ -21,6 +22,23 @@ function index(props = {}) {
   }
   
   h1 { color: #4f46e5; }
+  
+  .info {
+    margin: 2rem 0;
+    padding: 1rem;
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    border-radius: 4px;
+  }
+  
+  .info h3 {
+    margin-top: 0;
+    color: #92400e;
+  }
+  
+  .info strong {
+    color: #92400e;
+  }
   
   .nav {
     margin: 2rem 0;
@@ -81,7 +99,7 @@ function index(props = {}) {
     `
   `,
     __LUMIX__.h('h1', null, [
-      `Lumix (Static)`
+      `Lumix (Static Site Generation)`
     ]),
     `
   `,
@@ -91,6 +109,43 @@ function index(props = {}) {
         `src/routes/index.lumix`
       ]),
       `.`
+    ]),
+    `
+  
+  `,
+    __LUMIX__.h('div', {
+      'class': 'info'
+    }, [
+      `
+    `,
+      __LUMIX__.h('h3', null, [
+        `SSG vs SSR:`
+      ]),
+      `
+    `,
+      __LUMIX__.h('p', null, [
+        __LUMIX__.h('strong', null, [
+          `Esta página (SSG):`
+        ]),
+        ` Generada una vez en build time. El timestamp NO cambia al recargar.`
+      ]),
+      `
+    `,
+      __LUMIX__.h('p', null, [
+        `Build timestamp: `,
+        __LUMIX__.h('strong', null, [
+          () => (buildTime)
+        ])
+      ]),
+      `
+    `,
+      __LUMIX__.h('p', null, [
+        __LUMIX__.h('em', null, [
+          `Recarga la página varias veces - el timestamp permanece igual porque es estático.`
+        ])
+      ]),
+      `
+  `
     ]),
     `
   
@@ -129,7 +184,7 @@ function index(props = {}) {
       `
     `,
       __LUMIX__.h('p', null, [
-        `Interactive counter (this is an island):`
+        `Interactive counter (island hidratada en cliente):`
       ]),
       `
     `,
@@ -138,6 +193,13 @@ function index(props = {}) {
       }, [
         `Count: `,
         () => (count())
+      ]),
+      `
+    `,
+      __LUMIX__.h('p', null, [
+        __LUMIX__.h('em', null, [
+          `Este contador funciona porque se hidrata en el cliente, pero el HTML inicial es estático.`
+        ])
       ]),
       `
   `

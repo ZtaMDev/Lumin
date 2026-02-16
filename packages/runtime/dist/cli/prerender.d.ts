@@ -2,13 +2,14 @@ import type { LuminConfig } from "../config.js";
 export interface PrerenderOptions {
     cwd: string;
     config: LuminConfig;
-    clientScriptSrc: string;
+    staticRoutes: any[];
+    manifest: any;
     outDir?: string;
     rootId?: string;
     title?: string;
 }
 /**
- * Prerender all routes to static HTML files (SSG like Astro).
- * Requires happy-dom and @lumix-js/compiler. Call after Vite client build.
+ * Prerender static routes to HTML files with per-route code splitting.
+ * Each route gets its own HTML file with only the JS it needs.
  */
 export declare function prerender(options: PrerenderOptions): Promise<void>;

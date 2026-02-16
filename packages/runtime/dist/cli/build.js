@@ -55,23 +55,6 @@ function parseDirectiveFromLumix(lumixContent, routePath) {
         throw new Error(`Failed to parse directive: ${error.message}`);
     }
 }
-/**
- * Constructs the correct client script source path, avoiding duplication
- * when the entry chunk filename already contains the assets prefix.
- */
-function constructClientScriptSrc(entryChunkFileName) {
-    if (!entryChunkFileName || typeof entryChunkFileName !== 'string') {
-        throw new Error('Entry chunk filename must be a non-empty string');
-    }
-    // Remove any leading slashes and normalize
-    const normalizedFilename = entryChunkFileName.replace(/^\/+/, '');
-    // If the filename already starts with "assets/", don't add it again
-    if (normalizedFilename.startsWith("assets/")) {
-        return "/" + normalizedFilename;
-    }
-    // Otherwise, add the assets prefix
-    return "/assets/" + normalizedFilename;
-}
 import lumix from "../../../vite-plugin-lumix/dist/index.js";
 import pc from "picocolors";
 import { loadConfig } from "./loader.js";
@@ -79,165 +62,90 @@ import path from "path";
 import fs from "fs-extra";
 import { __dirname } from "./utils.js";
 import { VERSION } from "./constants.js";
-async function generateSSGMain(cwd, config) {
+/**
+ * Generate per-route entry files for code splitting
+ * Each route gets its own bundle to avoid shipping unnecessary code
+ */
+async function generateRouteEntries(cwd, config) {
     const { compile } = await import("@lumix-js/compiler");
     // Read routes
     const routesPath = path.join(cwd, ".lumix", "routes.mjs");
     const routesContent = fs.readFileSync(routesPath, "utf8");
     const routesMatch = routesContent.match(/export const routes = (\[.*\]);/s);
     if (!routesMatch)
-        return;
+        return { staticRoutes: [], serverRoutes: [] };
     const routes = JSON.parse(routesMatch[1]);
-    // Generate imports and component map with obfuscated keys
-    let imports = `import { hydrate } from "lumix-js";\n`;
-    let componentMap = `const components = {\n`;
-    // Create a secure mapping that doesn't expose file paths
-    const secureComponentMap = {};
-    const routeDirectives = {}; // Track directives per route
-    for (let i = 0; i < routes.length; i++) {
-        const route = routes[i];
+    const routeDirectives = {};
+    const staticRoutes = [];
+    const serverRoutes = [];
+    // Compile each route and categorize by directive
+    for (const route of routes) {
         const lumixPath = path.join(cwd, route.file.replace(/^\//, ""));
-        if (fs.existsSync(lumixPath)) {
+        if (!fs.existsSync(lumixPath))
+            continue;
+        try {
+            const lumixContent = fs.readFileSync(lumixPath, "utf8");
+            let directive = "static";
             try {
-                // Read the original .lumix file to detect directives
-                const lumixContent = fs.readFileSync(lumixPath, "utf8");
-                // Parse directives using proper AST parsing instead of regex
-                let directive = "static"; // Default to static
-                try {
-                    directive = parseDirectiveFromLumix(lumixContent, route.path);
-                }
-                catch (error) {
-                    console.warn(`[lumix] Warning in ${route.path}: Failed to parse directive, using default 'static'`);
-                }
-                routeDirectives[route.path] = directive;
-                // Compile the .lumix file to JavaScript
-                const js = await compile({ input: lumixPath, bundle: false, checkTypes: false });
-                // Fix any incorrect imports from the compiler
-                const fixedJs = js.replace(/from ["']lumin-js["']/g, 'from "lumix-js"')
-                    .replace(/import\s*\*\s*as\s*\w+\s*from\s*["']lumin-js["']/g, (match) => match.replace('lumin-js', 'lumix-js'));
-                // Write the compiled component to a temporary file
-                const tempDir = path.join(cwd, ".lumix", "compiled");
-                if (!fs.existsSync(tempDir))
-                    fs.mkdirSync(tempDir, { recursive: true });
-                const safeName = route.path === "/" ? "index" : route.path.slice(1).replace(/\//g, "-");
-                const tempPath = path.join(tempDir, `${safeName}.mjs`);
-                fs.writeFileSync(tempPath, fixedJs, "utf8");
-                // Use obfuscated component ID instead of file path
-                const componentId = `c${i}`;
-                secureComponentMap[route.path] = componentId;
-                imports += `import Component${i} from "./compiled/${safeName}.mjs";\n`;
-                componentMap += `  "${componentId}": Component${i},\n`;
-                console.log(`[lumix] Route ${route.path}: ${directive} rendering`);
+                directive = parseDirectiveFromLumix(lumixContent, route.path);
             }
-            catch (e) {
-                console.warn(`[lumix ssg] Failed to compile ${route.file}:`, e.message);
+            catch (error) {
+                console.warn(`[lumix] Warning in ${route.path}: Failed to parse directive, using default 'static'`);
             }
+            routeDirectives[route.path] = directive;
+            // Compile the .lumix file
+            const js = await compile({ input: lumixPath, bundle: false, checkTypes: false });
+            const fixedJs = js.replace(/from ["']lumin-js["']/g, 'from "lumix-js"')
+                .replace(/import\s*\*\s*as\s*\w+\s*from\s*["']lumin-js["']/g, (match) => match.replace('lumin-js', 'lumix-js'));
+            // Write compiled component
+            const tempDir = path.join(cwd, ".lumix", "compiled");
+            if (!fs.existsSync(tempDir))
+                fs.mkdirSync(tempDir, { recursive: true });
+            const safeName = route.path === "/" ? "index" : route.path.slice(1).replace(/\//g, "-");
+            const tempPath = path.join(tempDir, `${safeName}.mjs`);
+            fs.writeFileSync(tempPath, fixedJs, "utf8");
+            // Generate per-route entry file for client-side hydration with absolute path
+            const compiledPathRelative = path.relative(path.join(cwd, ".lumix", "entries"), tempPath).replace(/\\/g, '/');
+            const entryContent = `import { hydrate } from "lumix-js";
+import Component from "../compiled/${safeName}.mjs";
+
+// Hydrate this specific route
+const root = document.getElementById("${config?.rootId ?? "app"}");
+if (root) {
+  hydrate(root, Component);
+}
+
+// Export for dynamic imports
+export default Component;
+`;
+            const entryPath = path.join(cwd, ".lumix", "entries", `${safeName}.js`);
+            const entriesDir = path.join(cwd, ".lumix", "entries");
+            if (!fs.existsSync(entriesDir))
+                fs.mkdirSync(entriesDir, { recursive: true });
+            fs.writeFileSync(entryPath, entryContent, "utf8");
+            const routeInfo = {
+                path: route.path,
+                safeName,
+                directive,
+                entryPath,
+                compiledPath: tempPath
+            };
+            if (directive === "static") {
+                staticRoutes.push(routeInfo);
+            }
+            else {
+                serverRoutes.push(routeInfo);
+            }
+            console.log(`[lumix] Route ${route.path}: ${directive} rendering`);
+        }
+        catch (e) {
+            console.warn(`[lumix] Failed to compile ${route.file}:`, e.message);
         }
     }
-    componentMap += `};\n`;
-    // Generate secure routes mapping (only paths, no file info) with directives
-    const secureRoutes = routes.map((route, i) => ({
-        path: route.path,
-        id: `c${i}`,
-        directive: routeDirectives[route.path] || "static"
-    }));
-    // Store directives info for the prerender process
+    // Store directives info
     const directivesPath = path.join(cwd, ".lumix", "directives.json");
     fs.writeFileSync(directivesPath, JSON.stringify(routeDirectives, null, 2), "utf8");
-    // Generate the main content with security improvements and directive support
-    const mainContent = `${imports}
-${componentMap}
-
-// Secure routes mapping with directives - no file paths exposed
-const routes = ${JSON.stringify(secureRoutes)};
-
-// Islands Architecture Support
-export async function hydrateIsland(element, componentPath, props) {
-  // Find component by path instead of file path
-  const route = routes.find(r => r.path === componentPath);
-  if (!route) {
-    console.warn("Route not found for island:", componentPath);
-    return;
-  }
-  
-  const Component = components[route.id];
-  if (!Component) {
-    console.warn("Component not found for island:", route.id);
-    return;
-  }
-  
-  // Hydrate the island
-  hydrate(element, Component, props);
-}
-
-// Client-side routing (only for current page, no route discovery)
-function getCurrentPath() {
-  return window.location.pathname.replace(/\\/$/, "") || "/";
-}
-
-function findCurrentRoute() {
-  const currentPath = getCurrentPath();
-  return routes.find((r) => r.path === currentPath);
-}
-
-// Only hydrate if this is a SPA navigation (no islands present)
-if (!window.__LUMIX_ISLANDS__ || window.__LUMIX_ISLANDS__.length === 0) {
-  const currentRoute = findCurrentRoute();
-  if (currentRoute) {
-    const root = document.getElementById("${config?.rootId ?? "app"}");
-    if (root) {
-      const Component = components[currentRoute.id];
-      if (Component) {
-        hydrate(root, Component);
-      }
-    }
-  }
-  
-  // Handle client-side navigation (only for known routes)
-  document.addEventListener("click", (e) => {
-    const a = e.target.closest("a");
-    if (!a || a.target === "_blank" || a.hasAttribute("download") || !a.href) return;
-    
-    const url = new URL(a.href);
-    if (url.origin !== window.location.origin) return;
-    
-    // Only navigate to known routes (security check)
-    const targetRoute = routes.find(r => r.path === url.pathname);
-    if (!targetRoute) return;
-    
-    e.preventDefault();
-    window.history.pushState({}, "", url.pathname);
-    
-    // Navigate to the new route
-    const root = document.getElementById("${config?.rootId ?? "app"}");
-    if (root) {
-      const Component = components[targetRoute.id];
-      if (Component) {
-        while (root.firstChild) root.removeChild(root.firstChild);
-        hydrate(root, Component);
-      }
-    }
-  });
-  
-  // Handle back/forward navigation
-  window.addEventListener("popstate", () => {
-    const currentRoute = findCurrentRoute();
-    if (currentRoute) {
-      const root = document.getElementById("${config?.rootId ?? "app"}");
-      if (root) {
-        const Component = components[currentRoute.id];
-        if (Component) {
-          while (root.firstChild) root.removeChild(root.firstChild);
-          hydrate(root, Component);
-        }
-      }
-    }
-  });
-}
-`;
-    // Write the SSG main file
-    const ssgMainPath = path.join(cwd, ".lumix", "ssg-main.js");
-    fs.writeFileSync(ssgMainPath, mainContent, "utf8");
+    return { staticRoutes, serverRoutes, routeDirectives };
 }
 export async function build() {
     const cwd = process.cwd();
@@ -247,11 +155,169 @@ export async function build() {
     console.log(pc.dim("  Building for production...\n"));
     const isSsg = config.mode === "ssg";
     if (isSsg) {
+        // Clean dist directory before build
+        const distPath = path.join(cwd, "dist");
+        if (fs.existsSync(distPath)) {
+            console.log(pc.dim("  Cleaning dist directory...\n"));
+            fs.removeSync(distPath);
+        }
         const { ensureLumixRoutesFile } = await import("../vinxi.js");
-        const routesPath = ensureLumixRoutesFile(cwd, config);
-        // Generate a SSG-compatible main.ts that includes all components statically
-        await generateSSGMain(cwd, config);
+        ensureLumixRoutesFile(cwd, config);
+        // Generate per-route entries with code splitting
+        const { staticRoutes, serverRoutes, routeDirectives } = await generateRouteEntries(cwd, config);
+        console.log(pc.dim(`\n  Static routes: ${staticRoutes.length}, Server routes: ${serverRoutes.length}\n`));
+        // Build client bundles (only for static routes)
+        if (staticRoutes.length > 0) {
+            console.log(pc.dim("  Building client bundles...\n"));
+            const clientEntries = {};
+            for (const route of staticRoutes) {
+                clientEntries[route.safeName] = route.entryPath;
+            }
+            await viteBuild({
+                root: cwd,
+                base: "/",
+                plugins: [
+                    lumix(config),
+                    ...(config.vite?.plugins || []),
+                ],
+                build: {
+                    outDir: "dist/client",
+                    emptyOutDir: true,
+                    manifest: true, // Generate manifest for prerendering
+                    rollupOptions: {
+                        input: clientEntries,
+                        output: {
+                            entryFileNames: 'assets/[name]-[hash].js',
+                            chunkFileNames: 'assets/[name]-[hash].js',
+                            assetFileNames: 'assets/[name]-[hash][extname]'
+                        }
+                    },
+                    ...config.vite?.build,
+                },
+                resolve: {
+                    alias: {
+                        "lumix-js": path.resolve(__dirname, "../index.js"),
+                        ...config.vite?.resolve?.alias,
+                    },
+                },
+                ...config.vite,
+            });
+            console.log(pc.green("  ✓ Client bundles built\n"));
+        }
+        // Build server bundles (only for server routes)
+        if (serverRoutes.length > 0) {
+            console.log(pc.dim("  Building server bundles...\n"));
+            const serverEntries = {};
+            for (const route of serverRoutes) {
+                serverEntries[route.safeName] = route.entryPath;
+            }
+            await viteBuild({
+                root: cwd,
+                base: "/",
+                plugins: [
+                    lumix(config),
+                    ...(config.vite?.plugins || []),
+                ],
+                build: {
+                    outDir: "dist/server",
+                    emptyOutDir: true,
+                    ssr: true,
+                    manifest: true, // Generate manifest for server bundles too
+                    rollupOptions: {
+                        input: serverEntries,
+                        output: {
+                            entryFileNames: '[name].js',
+                            chunkFileNames: '[name]-[hash].js',
+                            format: 'esm'
+                        }
+                    },
+                    ...config.vite?.build,
+                },
+                resolve: {
+                    alias: {
+                        "lumix-js": path.resolve(__dirname, "../index.js"),
+                        ...config.vite?.resolve?.alias,
+                    },
+                },
+                ...config.vite,
+            });
+            console.log(pc.green("  ✓ Server bundles built\n"));
+            // Also build client bundles for SSR routes (for hydration)
+            console.log(pc.dim("  Building client bundles for SSR routes...\n"));
+            const ssrClientEntries = {};
+            for (const route of serverRoutes) {
+                ssrClientEntries[`ssr-${route.safeName}`] = route.entryPath;
+            }
+            await viteBuild({
+                root: cwd,
+                base: "/",
+                plugins: [
+                    lumix(config),
+                    ...(config.vite?.plugins || []),
+                ],
+                build: {
+                    outDir: "dist/client",
+                    emptyOutDir: false, // Don't empty, we already have static routes
+                    manifest: true,
+                    rollupOptions: {
+                        input: ssrClientEntries,
+                        output: {
+                            entryFileNames: 'assets/[name]-[hash].js',
+                            chunkFileNames: 'assets/[name]-[hash].js',
+                            assetFileNames: 'assets/[name]-[hash][extname]'
+                        }
+                    },
+                    ...config.vite?.build,
+                },
+                resolve: {
+                    alias: {
+                        "lumix-js": path.resolve(__dirname, "../index.js"),
+                        ...config.vite?.resolve?.alias,
+                    },
+                },
+                ...config.vite,
+            });
+            console.log(pc.green("  ✓ SSR client bundles built\n"));
+        }
+        // Prerender static routes
+        if (staticRoutes.length > 0) {
+            console.log(pc.dim("  Prerendering static pages...\n"));
+            // Try to read the manifest (optional)
+            const manifestPath = path.join(cwd, "dist/client/.vite/manifest.json");
+            let manifest = {};
+            if (fs.existsSync(manifestPath)) {
+                try {
+                    manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+                    console.log(pc.dim("  Using Vite manifest for script resolution"));
+                }
+                catch (e) {
+                    console.warn(pc.yellow("  Warning: Failed to read manifest, will use filesystem fallback"));
+                }
+            }
+            else {
+                console.log(pc.dim("  No manifest found, using filesystem for script resolution"));
+            }
+            const { prerender } = await import("./prerender.js");
+            await prerender({
+                cwd,
+                config,
+                staticRoutes,
+                manifest,
+                outDir: "dist/client",
+                rootId: config?.rootId ?? "app",
+                title: config?.title,
+            });
+            console.log(pc.green("  ✓ Static pages prerendered\n"));
+        }
+        console.log(pc.green(pc.bold("  Build completed successfully!")));
+        console.log(pc.dim(`  Client output: ${pc.white("./dist/client")}`));
+        if (serverRoutes.length > 0) {
+            console.log(pc.dim(`  Server output: ${pc.white("./dist/server")}`));
+        }
+        console.log("");
+        return;
     }
+    // Non-SSG mode (original behavior)
     const indexPath = path.join(cwd, "index.html");
     const hasIndex = fs.existsSync(indexPath);
     const srcDir = config?.srcDir ?? "src";
@@ -264,18 +330,8 @@ export async function build() {
             : fs.existsSync(mainTs)
                 ? mainTs
                 : mainJs;
-    let entryChunkFileName = null;
-    const captureEntryPlugin = {
-        name: "lumix-capture-entry",
-        generateBundle(_opts, bundle) {
-            const chunks = Object.values(bundle);
-            const entry = chunks.find((c) => c.type === "chunk" && c.isEntry);
-            if (entry)
-                entryChunkFileName = entry.fileName;
-        },
-    };
     try {
-        const htmlEmitPlugin = !hasIndex && !isSsg
+        const htmlEmitPlugin = !hasIndex
             ? {
                 name: "lumix-html-index-emitter",
                 generateBundle(_opts, bundle) {
@@ -304,7 +360,6 @@ export async function build() {
             root: cwd,
             base: "/",
             plugins: [
-                captureEntryPlugin,
                 ...(htmlEmitPlugin ? [htmlEmitPlugin] : []),
                 lumix(config),
                 ...(config.vite?.plugins || []),
@@ -312,13 +367,11 @@ export async function build() {
             build: {
                 outDir: "dist",
                 emptyOutDir: true,
-                ...(hasIndex && !isSsg
+                ...(hasIndex
                     ? {}
                     : {
                         rollupOptions: {
-                            input: isSsg
-                                ? path.join(cwd, ".lumix", "ssg-main.js")
-                                : entryModule,
+                            input: entryModule,
                         },
                     }),
                 ...config.vite?.build,
@@ -331,17 +384,6 @@ export async function build() {
             },
             ...config.vite,
         });
-        if (isSsg && entryChunkFileName) {
-            const { prerender } = await import("./prerender.js");
-            await prerender({
-                cwd,
-                config,
-                clientScriptSrc: constructClientScriptSrc(entryChunkFileName),
-                outDir: "dist",
-                rootId: config?.rootId ?? "app",
-                title: config?.title,
-            });
-        }
         console.log(pc.green(pc.bold("\n  Build completed successfully!")));
         console.log(pc.dim(`  Output directory: ${pc.white("./dist")}\n`));
     }

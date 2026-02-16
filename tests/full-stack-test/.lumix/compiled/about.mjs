@@ -79,16 +79,24 @@ function about(props = {}) {
     `
   `,
     __LUMIX__.h('h1', null, [
-      `About (Server-Side)`
+      `About (Server-Side Rendering)`
     ]),
     `
   `,
     __LUMIX__.h('p', null, [
-      `This page uses `,
+      `Esta página usa `,
       __LUMIX__.h('code', null, [
         `"use server"`
       ]),
-      ` directive for SSR.`
+      ` para SSR dinámico.`
+    ]),
+    `
+  `,
+    __LUMIX__.h('p', null, [
+      __LUMIX__.h('strong', null, [
+        `Comportamiento SSR:`
+      ]),
+      ` El timestamp cambia en cada recarga porque se renderiza en el servidor en cada request.`
     ]),
     `
   `,
@@ -109,7 +117,7 @@ function about(props = {}) {
     `
   `,
     __LUMIX__.h('p', null, [
-      `Interactive counter: `,
+      `Interactive counter (hidratado en cliente): `,
       __LUMIX__.h('span', null, [
         () => (count())
       ])
@@ -132,7 +140,7 @@ function about(props = {}) {
       __LUMIX__.h('a', {
         'href': '/'
       }, [
-        `← Back to Home`
+        `← Volver a Home (Static)`
       ]),
       `
   `

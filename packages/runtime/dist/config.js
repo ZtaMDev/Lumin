@@ -10,6 +10,7 @@ const VALID_KEYS = new Set([
     "mode",
     "router",
     "ssg",
+    "dev",
 ]);
 /**
  * Helper function to provide types for the LuminJS config.

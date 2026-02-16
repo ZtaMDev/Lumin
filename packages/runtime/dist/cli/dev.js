@@ -118,19 +118,42 @@ async function startSSGDevServer(cwd, config) {
     // Load directives to determine rendering mode per route
     const directivesPath = path.join(cwd, ".lumix", "directives.json");
     let directives = {};
+    // Cache for pre-rendered static pages (SSG behavior)
+    const staticPagesCache = new Map();
     const server = await createServer({
         root: cwd,
         base: "/",
         mode: "development",
+        clearScreen: false,
+        logLevel: "warn",
+        customLogger: {
+            info: (msg) => {
+                if (msg.includes('.lumix/'))
+                    return;
+                console.log(msg);
+            },
+            warn: (msg) => console.warn(msg),
+            error: (msg) => console.error(msg),
+            warnOnce: (msg) => console.warn(msg),
+            hasWarned: false,
+            clearScreen: () => { },
+            hasErrorLogged: () => false,
+        },
         plugins: [
             lumix(config),
-            // SSG/SSR Dev Middleware Plugin
             {
                 name: "lumix-dev-renderer",
                 configureServer(server) {
+                    // Watch for file changes to invalidate static cache
+                    server.watcher.on('change', (file) => {
+                        if (file.endsWith('.lumix')) {
+                            staticPagesCache.clear();
+                            const fileName = path.basename(file);
+                            console.log(pc.cyan(`  [lumix] Detected change: ${fileName} - Page will reload`));
+                        }
+                    });
                     server.middlewares.use(async (req, res, next) => {
                         const url = req.url?.split("?")[0] ?? "/";
-                        // Skip Vite internal requests, assets, API routes, and module requests
                         if (url.includes(".") ||
                             url.startsWith("/api") ||
                             url.startsWith("/@") ||
@@ -142,16 +165,13 @@ async function startSSGDevServer(cwd, config) {
                             req.headers.accept?.includes("application/javascript")) {
                             return next();
                         }
-                        // Only handle HTML page requests
                         if (!req.headers.accept?.includes("text/html")) {
                             return next();
                         }
                         try {
-                            // Reload directives on each request (for dev)
                             if (fs.existsSync(directivesPath)) {
                                 directives = JSON.parse(fs.readFileSync(directivesPath, "utf8"));
                             }
-                            // Get routes
                             const routesPath = path.join(cwd, ".lumix", "routes.mjs");
                             if (!fs.existsSync(routesPath)) {
                                 return next();
@@ -164,9 +184,14 @@ async function startSSGDevServer(cwd, config) {
                                 res.end("<h1>404 - Page Not Found</h1>");
                                 return;
                             }
-                            // Determine directive for this route
-                            const directive = directives[route.path] || "static";
-                            // Compile and render the component on-demand
+                            const detectedDirective = directives[route.path] || "static";
+                            // SSG: Check cache for static routes
+                            if (detectedDirective === "static" && staticPagesCache.has(route.path)) {
+                                res.setHeader("Content-Type", "text/html");
+                                res.setHeader("X-Lumix-Cache", "HIT");
+                                res.end(staticPagesCache.get(route.path));
+                                return;
+                            }
                             const { compile } = await import("@lumix-js/compiler");
                             const { renderToString } = await import("../dom.js");
                             const lumixPath = path.join(cwd, route.file.replace(/^\//, ""));
@@ -176,25 +201,13 @@ async function startSSGDevServer(cwd, config) {
                                 res.end("<h1>404 - Component Not Found</h1>");
                                 return;
                             }
-                            // Read the component to detect directive
-                            const lumixContent = fs.readFileSync(lumixPath, "utf8");
-                            let detectedDirective = "static";
-                            try {
-                                detectedDirective = parseDirectiveFromLumix(lumixContent, route.path);
-                            }
-                            catch (error) {
-                                console.warn(`[lumix dev] Warning in ${route.path}: ${error.message}, using default 'static'`);
-                            }
-                            // Compile the component
                             const js = await compile({ input: lumixPath, bundle: false, checkTypes: false });
-                            // Create a temporary module and load it
                             const tempDir = path.join(cwd, ".lumix", "dev-ssr");
                             if (!fs.existsSync(tempDir))
                                 fs.mkdirSync(tempDir, { recursive: true });
                             const safeName = route.path === "/" ? "index" : route.path.slice(1).replace(/\//g, "-");
                             const tempPath = path.join(tempDir, `${safeName}.mjs`);
                             fs.writeFileSync(tempPath, js, "utf8");
-                            // Load and render the component
                             const mod = await server.ssrLoadModule(tempPath);
                             const Comp = mod.default ?? mod.Component ?? mod;
                             if (typeof Comp !== "function") {
@@ -203,7 +216,7 @@ async function startSSGDevServer(cwd, config) {
                                 res.end("<h1>500 - Invalid Component</h1>");
                                 return;
                             }
-                            // For SSR routes, add server-side context
+                            // SSR: Add dynamic server-side props
                             let props = {};
                             if (detectedDirective === "server") {
                                 props = {
@@ -214,119 +227,11 @@ async function startSSGDevServer(cwd, config) {
                                 };
                             }
                             const result = renderToString(Comp, props);
-                            // Generate full HTML with styles
                             const stylesHtml = result.styles && result.styles.length > 0
                                 ? result.styles.map(style => `  <style>${style}</style>`).join('\n')
                                 : '';
-                            // Generate client-side router for proper navigation
-                            const routerScript = `
+                            const hydrationScript = `
 import { hydrate } from "lumix-js";
-
-// Client-side router with proper history handling
-class LumixRouter {
-  constructor() {
-    this.currentPath = window.location.pathname;
-    this.setupEventListeners();
-  }
-  
-  setupEventListeners() {
-    // Handle link clicks
-    document.addEventListener('click', (e) => {
-      const link = e.target.closest('a');
-      if (!link || link.target === '_blank' || !link.href) return;
-      
-      const url = new URL(link.href);
-      if (url.origin !== window.location.origin) return;
-      
-      e.preventDefault();
-      this.navigate(url.pathname);
-    });
-    
-    // Handle browser back/forward
-    window.addEventListener('popstate', (e) => {
-      this.handlePopState();
-    });
-  }
-  
-  navigate(path) {
-    if (path === this.currentPath) return;
-    
-    window.history.pushState({ path }, '', path);
-    this.currentPath = path;
-    this.loadPage(path);
-  }
-  
-  handlePopState() {
-    const path = window.location.pathname;
-    if (path !== this.currentPath) {
-      this.currentPath = path;
-      this.loadPage(path);
-    }
-  }
-  
-  async loadPage(path) {
-    try {
-      // Fetch the new page
-      const response = await fetch(path, {
-        headers: { 'Accept': 'text/html' }
-      });
-      
-      if (!response.ok) {
-        throw new Error(\`HTTP \${response.status}\`);
-      }
-      
-      const html = await response.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      
-      // Update the page content
-      const newContent = doc.querySelector('#${config?.rootId ?? "app"}');
-      const currentContent = document.querySelector('#${config?.rootId ?? "app"}');
-      
-      if (newContent && currentContent) {
-        currentContent.innerHTML = newContent.innerHTML;
-        
-        // Update title
-        const newTitle = doc.querySelector('title');
-        if (newTitle) {
-          document.title = newTitle.textContent;
-        }
-        
-        // Update styles (replace existing lumix styles)
-        const existingStyles = document.querySelectorAll('style[data-lumix]');
-        existingStyles.forEach(style => style.remove());
-        
-        const newStyles = doc.querySelectorAll('style');
-        newStyles.forEach(style => {
-          const newStyle = document.createElement('style');
-          newStyle.textContent = style.textContent;
-          newStyle.setAttribute('data-lumix', 'true');
-          document.head.appendChild(newStyle);
-        });
-        
-        // Re-hydrate the new content
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = newContent.innerHTML;
-        hydrate(currentContent, () => tempDiv);
-      }
-    } catch (error) {
-      console.error('Navigation error:', error);
-      // Fallback to full page reload
-      window.location.href = path;
-    }
-  }
-}
-
-// Initialize router when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    new LumixRouter();
-  });
-} else {
-  new LumixRouter();
-}
-
-// Initial hydration
 import Component from "./dev-ssr/${safeName}.mjs";
 
 function hydrateComponent() {
@@ -337,7 +242,7 @@ function hydrateComponent() {
   }
   
   hydrate(root, Component);
-  console.log("Lumix Dev: Component hydrated (\${detectedDirective} mode)");
+  console.log("Lumix Dev: Route ${route.path} hydrated (${detectedDirective} mode)");
 }
 
 if (document.readyState === 'loading') {
@@ -345,9 +250,131 @@ if (document.readyState === 'loading') {
 } else {
   hydrateComponent();
 }
+
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('a');
+  if (!link || link.target === '_blank' || !link.href) return;
+  
+  const url = new URL(link.href);
+  if (url.origin !== window.location.origin) return;
+  
+  e.preventDefault();
+  window.location.href = url.pathname;
+});
 `;
-                            const hydrationEntryPath = path.join(cwd, ".lumix", "dev-router.js");
-                            fs.writeFileSync(hydrationEntryPath, routerScript, "utf8");
+                            const hydrationEntryPath = path.join(cwd, ".lumix", `dev-route-${safeName}.js`);
+                            fs.writeFileSync(hydrationEntryPath, hydrationScript, "utf8");
+                            const cacheStatus = detectedDirective === "static" ? "MISS" : "BYPASS";
+                            const renderMode = detectedDirective === "static" ? "SSG (cached)" : "SSR (dynamic)";
+                            // Dev indicator (only if enabled in config)
+                            const showIndicator = config?.dev?.showIndicator ?? false;
+                            const devIndicator = showIndicator ? `
+  <div id="lumix-dev-info" style="position: fixed; bottom: 10px; right: 10px; background: ${detectedDirective === 'server' ? '#059669' : '#4f46e5'}; color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; z-index: 9999; font-family: monospace; cursor: move; user-select: none; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: all 0.3s ease;">
+    <div id="lumix-content" style="display: flex; align-items: center; gap: 8px;">
+      <span id="lumix-text">${renderMode} • ${route.path} • ${new Date().toLocaleTimeString()}</span>
+      <button id="lumix-toggle" style="background: rgba(255,255,255,0.2); border: none; color: white; cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 10px;">Hide</button>
+    </div>
+  </div>
+  <script>
+    (function() {
+      const indicator = document.getElementById('lumix-dev-info');
+      const content = document.getElementById('lumix-content');
+      const toggleBtn = document.getElementById('lumix-toggle');
+      const text = document.getElementById('lumix-text');
+      let isDragging = false;
+      let isHidden = false;
+      let currentX, currentY, initialX, initialY;
+      let xOffset = 0, yOffset = 0;
+      
+      // Load saved position and state
+      const savedPos = localStorage.getItem('lumix-indicator-pos');
+      const savedState = localStorage.getItem('lumix-indicator-hidden');
+      
+      if (savedPos) {
+        const { x, y } = JSON.parse(savedPos);
+        indicator.style.right = 'auto';
+        indicator.style.bottom = 'auto';
+        indicator.style.left = x + 'px';
+        indicator.style.top = y + 'px';
+        xOffset = x;
+        yOffset = y;
+      }
+      
+      if (savedState === 'true') {
+        isHidden = true;
+        applyHiddenState();
+      }
+      
+      function applyHiddenState() {
+        if (isHidden) {
+          // Convert to circle
+          text.style.display = 'none';
+          toggleBtn.textContent = '👁';
+          toggleBtn.style.background = 'transparent';
+          toggleBtn.style.padding = '0';
+          indicator.style.padding = '8px';
+          indicator.style.borderRadius = '50%';
+          indicator.style.width = '32px';
+          indicator.style.height = '32px';
+          content.style.justifyContent = 'center';
+        } else {
+          // Restore full state
+          text.style.display = 'inline';
+          toggleBtn.textContent = 'Hide';
+          toggleBtn.style.background = 'rgba(255,255,255,0.2)';
+          toggleBtn.style.padding = '2px 6px';
+          indicator.style.padding = '8px 12px';
+          indicator.style.borderRadius = '4px';
+          indicator.style.width = 'auto';
+          indicator.style.height = 'auto';
+          content.style.justifyContent = 'flex-start';
+        }
+      }
+      
+      // Toggle visibility
+      toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        isHidden = !isHidden;
+        applyHiddenState();
+        localStorage.setItem('lumix-indicator-hidden', isHidden.toString());
+      });
+      
+      // Drag functionality - works in both states
+      indicator.addEventListener('mousedown', dragStart);
+      document.addEventListener('mousemove', drag);
+      document.addEventListener('mouseup', dragEnd);
+      
+      function dragStart(e) {
+        if (e.target === toggleBtn && !isHidden) return;
+        initialX = e.clientX - xOffset;
+        initialY = e.clientY - yOffset;
+        isDragging = true;
+        indicator.style.cursor = 'grabbing';
+      }
+      
+      function drag(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        currentX = e.clientX - initialX;
+        currentY = e.clientY - initialY;
+        xOffset = currentX;
+        yOffset = currentY;
+        
+        indicator.style.right = 'auto';
+        indicator.style.bottom = 'auto';
+        indicator.style.left = currentX + 'px';
+        indicator.style.top = currentY + 'px';
+      }
+      
+      function dragEnd() {
+        if (isDragging) {
+          localStorage.setItem('lumix-indicator-pos', JSON.stringify({ x: xOffset, y: yOffset }));
+          indicator.style.cursor = 'move';
+        }
+        isDragging = false;
+      }
+    })();
+  </script>` : '';
                             const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -359,16 +386,18 @@ if (document.readyState === 'loading') {
   <meta name="lumix-timestamp" content="${new Date().toISOString()}">
 ${stylesHtml}
   <script type="module" src="/@vite/client"></script>
-  <script type="module" src="/.lumix/dev-router.js"></script>
+  <script type="module" src="/.lumix/dev-route-${safeName}.js"></script>
 </head>
 <body>
-  <div id="${config?.rootId ?? "app"}">${result.html}</div>
-  <div id="lumix-dev-info" style="position: fixed; bottom: 10px; right: 10px; background: #333; color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; z-index: 9999;">
-    ${detectedDirective.toUpperCase()} • ${route.path} • ${new Date().toLocaleTimeString()}
-  </div>
+  <div id="${config?.rootId ?? "app"}">${result.html}</div>${devIndicator}
 </body>
 </html>`;
+                            // SSG: Cache static pages
+                            if (detectedDirective === "static") {
+                                staticPagesCache.set(route.path, html);
+                            }
                             res.setHeader("Content-Type", "text/html");
+                            res.setHeader("X-Lumix-Cache", cacheStatus);
                             res.end(html);
                         }
                         catch (error) {
@@ -397,6 +426,7 @@ ${stylesHtml}
     await server.listen();
     const port = server.config.server.port;
     console.log(`  ${pc.green("➜")}  ${pc.bold("Local:")}   ${pc.cyan(`http://localhost:${port}/`)} ${pc.dim("(SSG/SSR Dev)")}`);
+    console.log(`  ${pc.dim("  Static routes cached (SSG), Server routes dynamic (SSR)")}`);
     console.log(`  ${pc.green("➜")}  ${pc.dim("Ready in")} ${pc.white(Math.round(performance.now()))}ms\n`);
 }
 async function startServer(cwd) {
