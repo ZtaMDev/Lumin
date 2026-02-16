@@ -485,7 +485,7 @@ export { index };
 const __LUMIX_ROOT__ = index;
 
 // Head metadata
-export const head = {title: "Home - Lumix Framework", meta: [{"content":"Welcome to Lumix - A high-performance web framework with Progressive Instant Rendering","name":"description"},{"content":"Lumix Framework","property":"og:title"},{"content":"High-performance web framework with PIR","property":"og:description"},{"name":"keywords","content":"lumix, web framework, PIR, progressive rendering"}]};
+export const head = {title: "Home - Lumix Framework", meta: [{"name":"description","content":"Welcome to Lumix - A high-performance web framework with Progressive Instant Rendering"},{"property":"og:title","content":"Lumix Framework"},{"property":"og:description","content":"High-performance web framework with PIR"},{"content":"lumix, web framework, PIR, progressive rendering","name":"keywords"}]};
 
 export function hydrate(root, props) {
   __LUMIX__.hydrate(root, index, props);

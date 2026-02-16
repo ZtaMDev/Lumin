@@ -493,7 +493,7 @@ export { about };
 const __LUMIX_ROOT__ = about;
 
 // Head metadata
-export const head = {title: "About - Lumix Framework", meta: [{"content":"Learn about Lumix SSR capabilities and server-side rendering","name":"description"},{"property":"og:title","content":"About Lumix"},{"content":"Server-side rendering with Lumix","property":"og:description"}]};
+export const head = {title: "About - Lumix Framework", meta: [{"name":"description","content":"Learn about Lumix SSR capabilities and server-side rendering"},{"property":"og:title","content":"About Lumix"},{"content":"Server-side rendering with Lumix","property":"og:description"}]};
 
 export function hydrate(root, props) {
   __LUMIX__.hydrate(root, about, props);
