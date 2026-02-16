@@ -1,83 +1,280 @@
+---
+import MainLayout from "/src/layouts/MainLayout.lumix"
+import Counter from "/src/components/Counter.lumix"
+---
+
 <script>
-  "use server"; // Directiva para SSR - renderizado dinámico en el servidor
+  "use server"; // SSR mode - Server-Side Rendering
   
   import { signal } from "lumix-js";
   
-  // Este código se ejecuta en CADA REQUEST del servidor
-  // Por eso el timestamp cambia en cada recarga
   const serverTime = new Date().toISOString();
-  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Server-Side';
+  const requestCount = signal(0);
   
-  // Client-side interactivity - se hidrata en el cliente
-  const count = signal(0);
+  export const head = {
+    title: "About - Lumix Framework",
+    meta: [
+      { name: "description", content: "Learn about Lumix SSR capabilities and server-side rendering" },
+      { property: "og:title", content: "About Lumix" },
+      { property: "og:description", content: "Server-side rendering with Lumix" }
+    ]
+  };
 </script>
 
-<div class="page">
-  <h1>About (Server-Side Rendering)</h1>
-  <p>Esta página usa <code>"use server"</code> para SSR dinámico.</p>
-  <p><strong>Comportamiento SSR:</strong> El timestamp cambia en cada recarga porque se renderiza en el servidor en cada request.</p>
-  <p>Server timestamp: <strong>{serverTime}</strong></p>
-  <p>User agent: <strong>{userAgent}</strong></p>
-  <p>Interactive counter (hidratado en cliente): <span>{count()}</span></p>
-  <button onclick={() => count(count() + 1)}>Increment</button>
-  
-  <nav class="nav">
-    <a href="/">← Volver a Home (Static)</a>
-  </nav>
-</div>
+<MainLayout>
+  <div class="page">
+    <div class="hero">
+      <img src="/icons/logo.svg" alt="Lumix" class="hero-logo" width="80" height="80" />
+      <h1>About</h1>
+      <p class="subtitle">Server-Side Rendering in action</p>
+    </div>
+    
+    <div class="info-card ssr">
+      <div class="card-icon">
+        <img src="/icons/monitor.svg" alt="" width="24" height="24" />
+      </div>
+      <h2>Server-Side Rendering (SSR)</h2>
+      <p>This page is rendered on the server for every request, then hydrated on the client for interactivity.</p>
+      <ul>
+        <li>
+          <img src="/icons/check.svg" alt="" width="16" height="16" />
+          Dynamic server-side data
+        </li>
+        <li>
+          <img src="/icons/check.svg" alt="" width="16" height="16" />
+          Fresh content on every request
+        </li>
+        <li>
+          <img src="/icons/check.svg" alt="" width="16" height="16" />
+          Client-side hydration
+        </li>
+      </ul>
+    </div>
+    
+    <div class="server-info">
+      <h3>Server Information</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">
+            <img src="/icons/clock.svg" alt="" width="16" height="16" />
+            <span>Server Time</span>
+          </div>
+          <span class="info-value">{serverTime}</span>
+        </div>
+        <div class="info-item">
+          <div class="info-label">
+            <img src="/icons/box.svg" alt="" width="16" height="16" />
+            <span>Rendering Mode</span>
+          </div>
+          <span class="info-value">SSR (Dynamic)</span>
+        </div>
+      </div>
+      <div class="hint">
+        <img src="/icons/help-circle.svg" alt="" width="16" height="16" />
+        <span>Reload this page to see the timestamp update</span>
+      </div>
+    </div>
+    
+    <div class="demo-section">
+      <h2>Client-Side Interactivity</h2>
+      <p class="demo-description">Even though this page is server-rendered, it's fully interactive on the client:</p>
+      <Counter initialCount={10} label="SSR Counter" />
+    </div>
+  </div>
+</MainLayout>
 
 <style>
-  .page { 
-    padding: 2rem; 
-    font-family: system-ui, sans-serif; 
-    max-width: 640px;
-    margin: 0 auto;
+  .page {
+    font-family: system-ui, -apple-system, sans-serif;
   }
   
-  h1 { 
-    color: #059669; 
+  .hero {
+    text-align: center;
+    margin-bottom: 4rem;
   }
   
-  .nav {
-    margin-top: 2rem;
-    padding: 1rem;
-    background: #f0fdf4;
-    border-radius: 8px;
+  .hero-logo {
+    display: block;
+    margin: 0 auto 2rem;
+    opacity: 0.9;
   }
   
-  .nav a {
-    color: #059669;
-    text-decoration: none;
-    font-weight: 500;
+  h1 {
+    font-size: 3.5rem;
+    margin: 0 0 1rem 0;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 800;
+    letter-spacing: -0.02em;
   }
   
-  .nav a:hover {
-    text-decoration: underline;
+  .subtitle {
+    font-size: 1.25rem;
+    color: #a1a1aa;
+    margin: 0;
+    font-weight: 400;
   }
   
-  button {
-    margin-top: 1rem;
-    padding: 0.5rem 1rem;
-    background: #059669;
+  .info-card {
+    background: rgba(24, 24, 27, 0.6);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    padding: 2rem;
+    margin: 3rem 0;
+    backdrop-filter: blur(12px);
+  }
+  
+  .card-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .card-icon svg {
     color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
   }
   
-  strong {
-    color: #059669;
+  .card-icon img {
+    display: block;
+    filter: brightness(0) saturate(100%) invert(100%);
   }
   
-  span {
-    font-weight: bold;
-    color: #059669;
+  .info-card h2 {
+    margin: 0 0 1rem 0;
+    color: #e4e4e7;
+    font-size: 1.5rem;
+    font-weight: 700;
   }
   
-  code {
-    background: #f0fdf4;
-    padding: 0.2rem 0.4rem;
-    border-radius: 4px;
-    color: #059669;
+  .info-card p {
+    color: #a1a1aa;
+    line-height: 1.6;
+    margin: 0 0 1.5rem 0;
+  }
+  
+  .info-card ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .info-card li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #d4d4d8;
+  }
+  
+  .info-card li svg {
+    color: #10b981;
+    flex-shrink: 0;
+  }
+  
+  .info-card li img {
+    flex-shrink: 0;
+    filter: brightness(0) saturate(100%) invert(64%) sepia(98%) saturate(1000%) hue-rotate(115deg) brightness(96%) contrast(89%);
+  }
+  
+  .server-info {
+    background: rgba(24, 24, 27, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 2rem;
+    margin: 3rem 0;
+  }
+  
+  .server-info h3 {
+    margin: 0 0 1.5rem 0;
+    color: #e4e4e7;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  
+  .info-grid {
+    display: grid;
+    gap: 1rem;
+  }
+  
+  .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: rgba(39, 39, 42, 0.6);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  
+  .info-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #a1a1aa;
+  }
+  
+  .info-label svg {
+    color: #10b981;
+  }
+  
+  .info-label img {
+    filter: brightness(0) saturate(100%) invert(64%) sepia(98%) saturate(1000%) hue-rotate(115deg) brightness(96%) contrast(89%);
+  }
+  
+  .info-value {
+    font-family: 'Courier New', monospace;
+    color: #10b981;
+    font-weight: 500;
+    font-size: 0.875rem;
+  }
+  
+  .hint {
+    margin: 1.5rem 0 0 0;
+    padding: 1rem;
+    background: rgba(234, 179, 8, 0.1);
+    border-radius: 12px;
+    border: 1px solid rgba(234, 179, 8, 0.2);
+    color: #fbbf24;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .hint svg {
+    flex-shrink: 0;
+  }
+  
+  .hint img {
+    flex-shrink: 0;
+    filter: brightness(0) saturate(100%) invert(79%) sepia(61%) saturate(1000%) hue-rotate(359deg) brightness(102%) contrast(97%);
+  }
+  
+  .demo-section {
+    margin: 4rem 0;
+  }
+  
+  .demo-section h2 {
+    text-align: center;
+    margin-bottom: 1rem;
+    color: #e4e4e7;
+    font-size: 2rem;
+    font-weight: 700;
+  }
+  
+  .demo-description {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #a1a1aa;
   }
 </style>

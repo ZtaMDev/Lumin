@@ -1,30 +1,252 @@
+---
+import MainLayout from "/src/layouts/MainLayout.lumix"
+import Counter from "/src/components/Counter.lumix"
+---
+
 <script>
-  import { signal } from "lumix-js";
-  const count = signal(0);
+  "use prerender"; // PIR mode - Progressive Instant Rendering
 </script>
 
-<div class="page">
-  <h1>Lumix</h1>
-  <p>Meta-framework template. Edit <code>src/routes/index.lumix</code>.</p>
-  <button onclick={() => count(count() + 1)}>Count: {count()}</button>
-</div>
+<MainLayout>
+  <div class="page">
+    <div class="hero">
+      <img src="/icons/logo.svg" alt="Lumix" class="hero-logo" width="80" height="80" />
+      <h1>Welcome to Lumix</h1>
+      <p class="subtitle">A high-performance web framework with Progressive Instant Rendering</p>
+    </div>
+    
+    <div class="info-card">
+      <div class="card-icon">
+        <img src="/icons/activity.svg" alt="" width="24" height="24" />
+      </div>
+      <h2>Progressive Instant Rendering (PIR)</h2>
+      <p>This page is prerendered at build time for instant loads and perfect SEO, then fully hydrated on the client for complete interactivity.</p>
+      <ul>
+        <li>
+          <img src="/icons/check.svg" alt="" width="16" height="16" />
+          Instant page loads
+        </li>
+        <li>
+          <img src="/icons/check.svg" alt="" width="16" height="16" />
+          Perfect SEO
+        </li>
+        <li>
+          <img src="/icons/check.svg" alt="" width="16" height="16" />
+          Full client-side interactivity
+        </li>
+      </ul>
+    </div>
+    
+    <div class="demo-section">
+      <h2>Interactive Component Demo</h2>
+      <Counter initialCount={0} label="Click Counter" />
+    </div>
+    
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">
+          <img src="/icons/zap.svg" alt="" width="24" height="24" />
+        </div>
+        <h3>Fast</h3>
+        <p>Native Rust compiler for near-instant builds</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">
+          <img src="/icons/smile.svg" alt="" width="24" height="24" />
+        </div>
+        <h3>Reactive</h3>
+        <p>Fine-grained reactivity with signals</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">
+          <img src="/icons/settings.svg" alt="" width="24" height="24" />
+        </div>
+        <h3>Flexible</h3>
+        <p>PIR, SSR, and SSG rendering modes</p>
+      </div>
+    </div>
+  </div>
+  
+  <div slot="footer">
+    <p>Built with Lumix • <a href="https://github.com/ZtaMDev/Lumix" target="_blank">GitHub</a></p>
+  </div>
+</MainLayout>
 
 <style>
   .page {
-    max-width: 640px;
-    margin: 0 auto;
-    padding: 2rem;
-    font-family: system-ui, sans-serif;
+    font-family: system-ui, -apple-system, sans-serif;
   }
-  h1 { color: #4f46e5; }
-  code { background: #f3f4f6; padding: 0.2rem 0.4rem; border-radius: 4px; }
-  button {
-    margin-top: 1rem;
-    padding: 0.5rem 1rem;
-    background: #4f46e5;
+  
+  .hero {
+    text-align: center;
+    margin-bottom: 4rem;
+  }
+  
+  .hero-logo {
+    display: block;
+    margin: 0 auto 2rem;
+    opacity: 0.9;
+  }
+  
+  h1 {
+    font-size: 3.5rem;
+    margin: 0 0 1rem 0;
+    background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  
+  .subtitle {
+    font-size: 1.25rem;
+    color: #a1a1aa;
+    margin: 0;
+    font-weight: 400;
+  }
+  
+  .info-card {
+    background: rgba(24, 24, 27, 0.6);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 16px;
+    padding: 2rem;
+    margin: 3rem 0;
+    backdrop-filter: blur(12px);
+  }
+  
+  .card-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .card-icon svg {
     color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
+  }
+  
+  .card-icon img {
+    display: block;
+    filter: brightness(0) saturate(100%) invert(100%);
+  }
+  
+  .info-card h2 {
+    margin: 0 0 1rem 0;
+    color: #e4e4e7;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+  
+  .info-card p {
+    color: #a1a1aa;
+    line-height: 1.6;
+    margin: 0 0 1.5rem 0;
+  }
+  
+  .info-card ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .info-card li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #d4d4d8;
+  }
+  
+  .info-card li svg {
+    color: #8b5cf6;
+    flex-shrink: 0;
+  }
+  
+  .info-card li img {
+    flex-shrink: 0;
+    filter: brightness(0) saturate(100%) invert(52%) sepia(98%) saturate(3283%) hue-rotate(242deg) brightness(96%) contrast(91%);
+  }
+  
+  .demo-section {
+    margin: 4rem 0;
+  }
+  
+  .demo-section h2 {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #e4e4e7;
+    font-size: 2rem;
+    font-weight: 700;
+  }
+  
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin: 4rem 0;
+  }
+  
+  .feature {
+    background: rgba(24, 24, 27, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 2rem;
+    transition: all 0.3s;
+  }
+  
+  .feature:hover {
+    transform: translateY(-4px);
+    border-color: rgba(139, 92, 246, 0.3);
+    box-shadow: 0 12px 24px rgba(139, 92, 246, 0.1);
+  }
+  
+  .feature-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(139, 92, 246, 0.1);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .feature-icon svg {
+    color: #8b5cf6;
+  }
+  
+  .feature-icon img {
+    display: block;
+    filter: brightness(0) saturate(100%) invert(52%) sepia(98%) saturate(3283%) hue-rotate(242deg) brightness(96%) contrast(91%);
+  }
+  
+  .feature h3 {
+    margin: 0 0 0.75rem 0;
+    color: #e4e4e7;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  
+  .feature p {
+    margin: 0;
+    color: #a1a1aa;
+    line-height: 1.6;
+  }
+  
+  [slot="footer"] a {
+    color: #8b5cf6;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  [slot="footer"] a:hover {
+    text-decoration: underline;
   }
 </style>

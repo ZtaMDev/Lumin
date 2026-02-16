@@ -81,6 +81,7 @@ export function h(tag, props, ...children) {
                 for (let item of items) {
                     if (item === null || item === undefined)
                         continue;
+                    // Unwrap nested functions
                     while (typeof item === "function") {
                         item = item();
                     }
@@ -88,7 +89,9 @@ export function h(tag, props, ...children) {
                         newNodes.push(item);
                     }
                     else {
-                        newNodes.push(document.createTextNode(String(item)));
+                        // Convert to string, handling primitives properly
+                        const textValue = item === null || item === undefined ? '' : String(item);
+                        newNodes.push(document.createTextNode(textValue));
                     }
                 }
                 // --- Improved Reconciliation ---
@@ -114,7 +117,9 @@ export function h(tag, props, ...children) {
             el.appendChild(child);
         }
         else {
-            el.appendChild(document.createTextNode(String(child)));
+            // Handle primitives - convert to string properly
+            const textValue = child === null || child === undefined ? '' : String(child);
+            el.appendChild(document.createTextNode(textValue));
         }
     }
     return el;
@@ -201,7 +206,7 @@ export function renderToString(Comp, props) {
     if (typeof document === "undefined" || !document.createElement) {
         throw new Error("[lumix] renderToString requires a DOM (e.g. use happy-dom in Node)");
     }
-    // Capture styles injected during rendering
+    // Capture styles injected during rendering with their IDs
     const capturedStyles = [];
     const detectedIslands = [];
     let islandCounter = 0;
@@ -211,17 +216,41 @@ export function renderToString(Comp, props) {
     document.createElement = function (tagName) {
         const element = originalCreateElement(tagName);
         if (tagName.toLowerCase() === 'style') {
-            // Override the textContent setter to capture style content
+            // Track the ID and content separately
+            let styleId = '';
             let styleContent = '';
+            // Override id property
+            const originalIdDescriptor = Object.getOwnPropertyDescriptor(element, 'id') ||
+                Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'id');
+            Object.defineProperty(element, 'id', {
+                get() { return styleId; },
+                set(value) {
+                    styleId = value;
+                    if (originalIdDescriptor && originalIdDescriptor.set) {
+                        originalIdDescriptor.set.call(element, value);
+                    }
+                },
+                configurable: true
+            });
+            // Override textContent property
+            const originalTextContentDescriptor = Object.getOwnPropertyDescriptor(element, 'textContent') ||
+                Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'textContent');
             Object.defineProperty(element, 'textContent', {
                 get() { return styleContent; },
                 set(value) {
                     styleContent = value;
-                    // Store the style content for later inclusion in HTML
-                    if (value && !capturedStyles.includes(value)) {
-                        capturedStyles.push(value);
+                    if (originalTextContentDescriptor && originalTextContentDescriptor.set) {
+                        originalTextContentDescriptor.set.call(element, value);
                     }
-                }
+                    // Capture the style when both id and content are set
+                    if (value && styleId) {
+                        const existing = capturedStyles.find(s => s.id === styleId);
+                        if (!existing) {
+                            capturedStyles.push({ id: styleId, content: value });
+                        }
+                    }
+                },
+                configurable: true
             });
         }
         return element;
@@ -231,8 +260,12 @@ export function renderToString(Comp, props) {
         if (node.nodeName === 'STYLE') {
             const styleElement = node;
             const content = styleElement.textContent;
-            if (content && !capturedStyles.includes(content)) {
-                capturedStyles.push(content);
+            const id = styleElement.id;
+            if (content && id) {
+                const existing = capturedStyles.find(s => s.id === id);
+                if (!existing) {
+                    capturedStyles.push({ id, content });
+                }
             }
             // Don't actually append to head during SSR - we'll include in final HTML
             return node;

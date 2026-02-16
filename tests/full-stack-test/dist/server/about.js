@@ -247,7 +247,8 @@ function h(tag, props, ...children) {
           if (item instanceof Node) {
             newNodes.push(item);
           } else {
-            newNodes.push(document.createTextNode(String(item)));
+            const textValue = item === null || item === void 0 ? "" : String(item);
+            newNodes.push(document.createTextNode(textValue));
           }
         }
         const newNodeSet = new Set(newNodes);
@@ -267,7 +268,8 @@ function h(tag, props, ...children) {
     } else if (child instanceof Node) {
       el.appendChild(child);
     } else {
-      el.appendChild(document.createTextNode(String(child)));
+      const textValue = child === null || child === void 0 ? "" : String(child);
+      el.appendChild(document.createTextNode(textValue));
     }
   }
   return el;
@@ -297,142 +299,259 @@ function hydrate(root2, component, props) {
       root2.appendChild(document.createTextNode(String(n)));
   }
 }
-function about(props = {}) {
-  "use server";
-  const serverTime = (/* @__PURE__ */ new Date()).toISOString();
-  const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "Server-Side";
-  const count = signal(0);
+function MainLayout(props = {}) {
   if (typeof document !== "undefined") {
-    const styleId = "lumix-style-about";
+    const styleId = "lumix-style-mainlayout";
     if (!document.getElementById(styleId)) {
       const s = document.createElement("style");
       s.id = styleId;
       s.textContent = `
-  .page { 
-    padding: 2rem; 
-    font-family: system-ui, sans-serif; 
-    max-width: 640px;
-    margin: 0 auto;
+  * {
+    box-sizing: border-box;
+    font-family: system-ui
   }
   
-  h1 { 
-    color: #059669; 
+  body {
+    margin: 0;
+    background: #0a0a0f;
+    color: #e4e4e7;
+  }
+  
+  .layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .header {
+    background: rgba(15, 15, 20, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+  
+  .header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+  }
+  
+  .logo svg {
+    color: #8b5cf6;
+  }
+  
+  .logo img {
+    display: block;
   }
   
   .nav {
-    margin-top: 2rem;
-    padding: 1rem;
-    background: #f0fdf4;
-    border-radius: 8px;
+    display: flex;
+    gap: 0.5rem;
   }
   
-  .nav a {
-    color: #059669;
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #a1a1aa;
     text-decoration: none;
     font-weight: 500;
-  }
-  
-  .nav a:hover {
-    text-decoration: underline;
-  }
-  
-  button {
-    margin-top: 1rem;
     padding: 0.5rem 1rem;
-    background: #059669;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
   }
   
-  strong {
-    color: #059669;
+  .nav-link:hover {
+    color: #fff;
+    background: rgba(139, 92, 246, 0.1);
   }
   
-  span {
-    font-weight: bold;
-    color: #059669;
+  .nav-link svg {
+    width: 18px;
+    height: 18px;
   }
   
-  code {
-    background: #f0fdf4;
-    padding: 0.2rem 0.4rem;
-    border-radius: 4px;
-    color: #059669;
+  .nav-link img {
+    display: block;
+    filter: brightness(0) saturate(100%) invert(67%) sepia(6%) saturate(289%) hue-rotate(202deg) brightness(93%) contrast(87%);
+  }
+  
+  .nav-link:hover img {
+    filter: brightness(0) saturate(100%) invert(100%);
+  }
+  
+  .main {
+    flex: 1;
+    padding: 3rem 0;
+  }
+  
+  .footer {
+    background: rgba(15, 15, 20, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 2rem 0;
+    text-align: center;
+    color: #71717a;
+    font-size: 0.875rem;
+  }
+  
+  .footer p {
+    margin: 0;
   }
 `;
       document.head.appendChild(s);
     }
   }
   return h(Fragment, null, h("div", {
-    "class": "page"
+    "class": "layout"
   }, [
     `
   `,
-    h("h1", null, [
-      `About (Server-Side Rendering)`
-    ]),
-    `
-  `,
-    h("p", null, [
-      `Esta página usa `,
-      h("code", null, [
-        `"use server"`
-      ]),
-      ` para SSR dinámico.`
-    ]),
-    `
-  `,
-    h("p", null, [
-      h("strong", null, [
-        `Comportamiento SSR:`
-      ]),
-      ` El timestamp cambia en cada recarga porque se renderiza en el servidor en cada request.`
-    ]),
-    `
-  `,
-    h("p", null, [
-      `Server timestamp: `,
-      h("strong", null, [
-        () => serverTime
-      ])
-    ]),
-    `
-  `,
-    h("p", null, [
-      `User agent: `,
-      h("strong", null, [
-        () => userAgent
-      ])
-    ]),
-    `
-  `,
-    h("p", null, [
-      `Interactive counter (hidratado en cliente): `,
-      h("span", null, [
-        () => count()
-      ])
-    ]),
-    `
-  `,
-    h("button", {
-      "onclick": () => count(count() + 1)
+    h("header", {
+      "class": "header"
     }, [
-      `Increment`
+      `
+    `,
+      h("div", {
+        "class": "container"
+      }, [
+        `
+      `,
+        h("div", {
+          "class": "logo"
+        }, [
+          `
+        `,
+          h("img", {
+            "src": "/icons/logo.svg",
+            "alt": "Lumix",
+            "width": "32",
+            "height": "32"
+          }),
+          `
+        `,
+          h("span", null, [
+            `Lumix`
+          ]),
+          `
+      `
+        ]),
+        `
+      `,
+        h("nav", {
+          "class": "nav"
+        }, [
+          `
+        `,
+          h("a", {
+            "href": "/",
+            "class": "nav-link"
+          }, [
+            `
+          `,
+            h("img", {
+              "src": "/icons/home.svg",
+              "alt": "",
+              "width": "20",
+              "height": "20"
+            }),
+            `
+          `,
+            h("span", null, [
+              `Home`
+            ]),
+            `
+        `
+          ]),
+          `
+        `,
+          h("a", {
+            "href": "/about",
+            "class": "nav-link"
+          }, [
+            `
+          `,
+            h("img", {
+              "src": "/icons/info.svg",
+              "alt": "",
+              "width": "20",
+              "height": "20"
+            }),
+            `
+          `,
+            h("span", null, [
+              `About`
+            ]),
+            `
+        `
+          ]),
+          `
+      `
+        ]),
+        `
+    `
+      ]),
+      `
+  `
     ]),
     `
   
   `,
-    h("nav", {
-      "class": "nav"
+    h("main", {
+      "class": "main"
     }, [
       `
     `,
-      h("a", {
-        "href": "/"
+      h("div", {
+        "class": "container"
       }, [
-        `← Volver a Home (Static)`
+        `
+      `,
+        props.children ? props.children() : [],
+        `
+    `
+      ]),
+      `
+  `
+    ]),
+    `
+  
+  `,
+    h("footer", {
+      "class": "footer"
+    }, [
+      `
+    `,
+      h("div", {
+        "class": "container"
+      }, [
+        `
+      `,
+        props.slots?.footer ? props.slots.footer() : [
+          h("p", null, [
+            `Built with Lumix • A modern web framework`
+          ])
+        ],
+        `
+    `
       ]),
       `
   `
@@ -440,6 +559,632 @@ function about(props = {}) {
     `
 `
   ]), `
+
+`);
+}
+function Counter(props = {}) {
+  let { initialCount = 0, label = "Count" } = props;
+  const count = signal(initialCount);
+  function increment() {
+    count(count() + 1);
+  }
+  function decrement() {
+    count(count() - 1);
+  }
+  function reset() {
+    count(initialCount);
+  }
+  if (typeof document !== "undefined") {
+    const styleId = "lumix-style-counter";
+    if (!document.getElementById(styleId)) {
+      const s = document.createElement("style");
+      s.id = styleId;
+      s.textContent = `
+  .counter {
+    background: rgba(24, 24, 27, 0.6);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 16px;
+    padding: 2.5rem;
+    text-align: center;
+    backdrop-filter: blur(12px);
+  }
+  
+  .counter h3 {
+    margin: 0 0 1.5rem 0;
+    color: #e4e4e7;
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+  }
+  
+  .display {
+    font-size: 4rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 1.5rem 0;
+    font-variant-numeric: tabular-nums;
+  }
+  
+  .buttons {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 2rem;
+  }
+  
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+  }
+  
+  .btn-secondary {
+    background: rgba(63, 63, 70, 0.6);
+    color: #e4e4e7;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .btn-secondary:hover {
+    background: rgba(82, 82, 91, 0.6);
+  }
+  
+  .btn:active {
+    transform: translateY(0);
+  }
+`;
+      document.head.appendChild(s);
+    }
+  }
+  return h(Fragment, null, h("div", {
+    "class": "counter"
+  }, [
+    `
+  `,
+    h("h3", null, [
+      () => label
+    ]),
+    `
+  `,
+    h("div", {
+      "class": "display"
+    }, [
+      () => count()
+    ]),
+    `
+  `,
+    h("div", {
+      "class": "buttons"
+    }, [
+      `
+    `,
+      h("button", {
+        "onclick": decrement,
+        "class": "btn btn-secondary"
+      }, [
+        `-`
+      ]),
+      `
+    `,
+      h("button", {
+        "onclick": reset,
+        "class": "btn btn-secondary"
+      }, [
+        `Reset`
+      ]),
+      `
+    `,
+      h("button", {
+        "onclick": increment,
+        "class": "btn btn-primary"
+      }, [
+        `+`
+      ]),
+      `
+  `
+    ]),
+    `
+`
+  ]), `
+
+`);
+}
+function about(props = {}) {
+  "use server";
+  const serverTime = (/* @__PURE__ */ new Date()).toISOString();
+  signal(0);
+  if (typeof document !== "undefined") {
+    const styleId = "lumix-style-about";
+    if (!document.getElementById(styleId)) {
+      const s = document.createElement("style");
+      s.id = styleId;
+      s.textContent = `
+  .page {
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  
+  .hero {
+    text-align: center;
+    margin-bottom: 4rem;
+  }
+  
+  .hero-logo {
+    display: block;
+    margin: 0 auto 2rem;
+    opacity: 0.9;
+  }
+  
+  h1 {
+    font-size: 3.5rem;
+    margin: 0 0 1rem 0;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  
+  .subtitle {
+    font-size: 1.25rem;
+    color: #a1a1aa;
+    margin: 0;
+    font-weight: 400;
+  }
+  
+  .info-card {
+    background: rgba(24, 24, 27, 0.6);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    padding: 2rem;
+    margin: 3rem 0;
+    backdrop-filter: blur(12px);
+  }
+  
+  .card-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .card-icon svg {
+    color: white;
+  }
+  
+  .card-icon img {
+    display: block;
+    filter: brightness(0) saturate(100%) invert(100%);
+  }
+  
+  .info-card h2 {
+    margin: 0 0 1rem 0;
+    color: #e4e4e7;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+  
+  .info-card p {
+    color: #a1a1aa;
+    line-height: 1.6;
+    margin: 0 0 1.5rem 0;
+  }
+  
+  .info-card ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .info-card li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #d4d4d8;
+  }
+  
+  .info-card li svg {
+    color: #10b981;
+    flex-shrink: 0;
+  }
+  
+  .info-card li img {
+    flex-shrink: 0;
+    filter: brightness(0) saturate(100%) invert(64%) sepia(98%) saturate(1000%) hue-rotate(115deg) brightness(96%) contrast(89%);
+  }
+  
+  .server-info {
+    background: rgba(24, 24, 27, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 2rem;
+    margin: 3rem 0;
+  }
+  
+  .server-info h3 {
+    margin: 0 0 1.5rem 0;
+    color: #e4e4e7;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  
+  .info-grid {
+    display: grid;
+    gap: 1rem;
+  }
+  
+  .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: rgba(39, 39, 42, 0.6);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  
+  .info-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #a1a1aa;
+  }
+  
+  .info-label svg {
+    color: #10b981;
+  }
+  
+  .info-label img {
+    filter: brightness(0) saturate(100%) invert(64%) sepia(98%) saturate(1000%) hue-rotate(115deg) brightness(96%) contrast(89%);
+  }
+  
+  .info-value {
+    font-family: 'Courier New', monospace;
+    color: #10b981;
+    font-weight: 500;
+    font-size: 0.875rem;
+  }
+  
+  .hint {
+    margin: 1.5rem 0 0 0;
+    padding: 1rem;
+    background: rgba(234, 179, 8, 0.1);
+    border-radius: 12px;
+    border: 1px solid rgba(234, 179, 8, 0.2);
+    color: #fbbf24;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .hint svg {
+    flex-shrink: 0;
+  }
+  
+  .hint img {
+    flex-shrink: 0;
+    filter: brightness(0) saturate(100%) invert(79%) sepia(61%) saturate(1000%) hue-rotate(359deg) brightness(102%) contrast(97%);
+  }
+  
+  .demo-section {
+    margin: 4rem 0;
+  }
+  
+  .demo-section h2 {
+    text-align: center;
+    margin-bottom: 1rem;
+    color: #e4e4e7;
+    font-size: 2rem;
+    font-weight: 700;
+  }
+  
+  .demo-description {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #a1a1aa;
+  }
+`;
+      document.head.appendChild(s);
+    }
+  }
+  return h(Fragment, null, h(MainLayout, {
+    "children": () => [
+      `
+  `,
+      h("div", {
+        "class": "page"
+      }, [
+        `
+    `,
+        h("div", {
+          "class": "hero"
+        }, [
+          `
+      `,
+          h("img", {
+            "src": "/icons/logo.svg",
+            "alt": "Lumix",
+            "class": "hero-logo",
+            "width": "80",
+            "height": "80"
+          }),
+          `
+      `,
+          h("h1", null, [
+            `About`
+          ]),
+          `
+      `,
+          h("p", {
+            "class": "subtitle"
+          }, [
+            `Server-Side Rendering in action`
+          ]),
+          `
+    `
+        ]),
+        `
+    
+    `,
+        h("div", {
+          "class": "info-card ssr"
+        }, [
+          `
+      `,
+          h("div", {
+            "class": "card-icon"
+          }, [
+            `
+        `,
+            h("img", {
+              "src": "/icons/monitor.svg",
+              "alt": "",
+              "width": "24",
+              "height": "24"
+            }),
+            `
+      `
+          ]),
+          `
+      `,
+          h("h2", null, [
+            `Server-Side Rendering (SSR)`
+          ]),
+          `
+      `,
+          h("p", null, [
+            `This page is rendered on the server for every request, then hydrated on the client for interactivity.`
+          ]),
+          `
+      `,
+          h("ul", null, [
+            `
+        `,
+            h("li", null, [
+              `
+          `,
+              h("img", {
+                "src": "/icons/check.svg",
+                "alt": "",
+                "width": "16",
+                "height": "16"
+              }),
+              `
+          Dynamic server-side data
+        `
+            ]),
+            `
+        `,
+            h("li", null, [
+              `
+          `,
+              h("img", {
+                "src": "/icons/check.svg",
+                "alt": "",
+                "width": "16",
+                "height": "16"
+              }),
+              `
+          Fresh content on every request
+        `
+            ]),
+            `
+        `,
+            h("li", null, [
+              `
+          `,
+              h("img", {
+                "src": "/icons/check.svg",
+                "alt": "",
+                "width": "16",
+                "height": "16"
+              }),
+              `
+          Client-side hydration
+        `
+            ]),
+            `
+      `
+          ]),
+          `
+    `
+        ]),
+        `
+    
+    `,
+        h("div", {
+          "class": "server-info"
+        }, [
+          `
+      `,
+          h("h3", null, [
+            `Server Information`
+          ]),
+          `
+      `,
+          h("div", {
+            "class": "info-grid"
+          }, [
+            `
+        `,
+            h("div", {
+              "class": "info-item"
+            }, [
+              `
+          `,
+              h("div", {
+                "class": "info-label"
+              }, [
+                `
+            `,
+                h("img", {
+                  "src": "/icons/clock.svg",
+                  "alt": "",
+                  "width": "16",
+                  "height": "16"
+                }),
+                `
+            `,
+                h("span", null, [
+                  `Server Time`
+                ]),
+                `
+          `
+              ]),
+              `
+          `,
+              h("span", {
+                "class": "info-value"
+              }, [
+                () => serverTime
+              ]),
+              `
+        `
+            ]),
+            `
+        `,
+            h("div", {
+              "class": "info-item"
+            }, [
+              `
+          `,
+              h("div", {
+                "class": "info-label"
+              }, [
+                `
+            `,
+                h("img", {
+                  "src": "/icons/box.svg",
+                  "alt": "",
+                  "width": "16",
+                  "height": "16"
+                }),
+                `
+            `,
+                h("span", null, [
+                  `Rendering Mode`
+                ]),
+                `
+          `
+              ]),
+              `
+          `,
+              h("span", {
+                "class": "info-value"
+              }, [
+                `SSR (Dynamic)`
+              ]),
+              `
+        `
+            ]),
+            `
+      `
+          ]),
+          `
+      `,
+          h("div", {
+            "class": "hint"
+          }, [
+            `
+        `,
+            h("img", {
+              "src": "/icons/help-circle.svg",
+              "alt": "",
+              "width": "16",
+              "height": "16"
+            }),
+            `
+        `,
+            h("span", null, [
+              `Reload this page to see the timestamp update`
+            ]),
+            `
+      `
+          ]),
+          `
+    `
+        ]),
+        `
+    
+    `,
+        h("div", {
+          "class": "demo-section"
+        }, [
+          `
+      `,
+          h("h2", null, [
+            `Client-Side Interactivity`
+          ]),
+          `
+      `,
+          h("p", {
+            "class": "demo-description"
+          }, [
+            `Even though this page is server-rendered, it's fully interactive on the client:`
+          ]),
+          `
+      `,
+          h(Counter, {
+            "initialCount": 10,
+            "label": "SSR Counter"
+          }),
+          `
+    `
+        ]),
+        `
+  `
+      ]),
+      `
+`
+    ]
+  }), `
 
 `);
 }

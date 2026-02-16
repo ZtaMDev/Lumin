@@ -10,13 +10,21 @@ function hydrateComponent() {
   }
   
   hydrate(root, Component);
-  console.log("Lumix Dev: Route / hydrated (static mode)");
+  console.log("Lumix Dev: Route / hydrated (prerender mode)");
 }
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', hydrateComponent);
 } else {
   hydrateComponent();
+}
+
+// HMR: Reload on .lumix file changes
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    console.log('[lumix] Hot reload triggered');
+    window.location.reload();
+  });
 }
 
 document.addEventListener('click', (e) => {

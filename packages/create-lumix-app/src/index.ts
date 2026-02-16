@@ -111,7 +111,8 @@ function getTemplates(): readonly TemplateChoice[] {
   return [
     { title: "Blank", value: "blank" },
     { title: "Blank (TypeScript)", value: "blank-ts" },
-    { title: "Sitemap (Coming soon...)", value: "sitemap", disabled: true },
+    { title: "Full-Stack App(TypeScript)", value: "full-stack-app" },
+    { title: "Full-Stack App(JavaScript) (Coming soon...)", value: "sitemap", disabled: true },
   ] as const;
 }
 

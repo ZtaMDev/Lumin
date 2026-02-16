@@ -101,6 +101,7 @@ export function h(
         for (let item of items) {
           if (item === null || item === undefined) continue;
 
+          // Unwrap nested functions
           while (typeof item === "function") {
             item = item();
           }
@@ -108,7 +109,9 @@ export function h(
           if (item instanceof Node) {
             newNodes.push(item);
           } else {
-            newNodes.push(document.createTextNode(String(item)));
+            // Convert to string, handling primitives properly
+            const textValue = item === null || item === undefined ? '' : String(item);
+            newNodes.push(document.createTextNode(textValue));
           }
         }
 
@@ -136,7 +139,9 @@ export function h(
     } else if (child instanceof Node) {
       el.appendChild(child);
     } else {
-      el.appendChild(document.createTextNode(String(child)));
+      // Handle primitives - convert to string properly
+      const textValue = child === null || child === undefined ? '' : String(child);
+      el.appendChild(document.createTextNode(textValue));
     }
   }
 
@@ -234,7 +239,7 @@ export interface IslandDescriptor {
 export interface RenderToStringResult {
   html: string;
   islands: IslandDescriptor[];
-  styles?: string[];
+  styles?: Array<{ id: string; content: string }>;
 }
 
 /**
@@ -253,8 +258,8 @@ export function renderToString(
     );
   }
 
-  // Capture styles injected during rendering
-  const capturedStyles: string[] = [];
+  // Capture styles injected during rendering with their IDs
+  const capturedStyles: Array<{ id: string; content: string }> = [];
   const detectedIslands: IslandDescriptor[] = [];
   let islandCounter = 0;
   
@@ -266,17 +271,45 @@ export function renderToString(
     const element = originalCreateElement(tagName);
     
     if (tagName.toLowerCase() === 'style') {
-      // Override the textContent setter to capture style content
+      // Track the ID and content separately
+      let styleId = '';
       let styleContent = '';
+      
+      // Override id property
+      const originalIdDescriptor = Object.getOwnPropertyDescriptor(element, 'id') || 
+                                   Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'id');
+      
+      Object.defineProperty(element, 'id', {
+        get() { return styleId; },
+        set(value: string) {
+          styleId = value;
+          if (originalIdDescriptor && originalIdDescriptor.set) {
+            originalIdDescriptor.set.call(element, value);
+          }
+        },
+        configurable: true
+      });
+      
+      // Override textContent property
+      const originalTextContentDescriptor = Object.getOwnPropertyDescriptor(element, 'textContent') || 
+                                            Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'textContent');
+      
       Object.defineProperty(element, 'textContent', {
         get() { return styleContent; },
         set(value: string) {
           styleContent = value;
-          // Store the style content for later inclusion in HTML
-          if (value && !capturedStyles.includes(value)) {
-            capturedStyles.push(value);
+          if (originalTextContentDescriptor && originalTextContentDescriptor.set) {
+            originalTextContentDescriptor.set.call(element, value);
           }
-        }
+          // Capture the style when both id and content are set
+          if (value && styleId) {
+            const existing = capturedStyles.find(s => s.id === styleId);
+            if (!existing) {
+              capturedStyles.push({ id: styleId, content: value });
+            }
+          }
+        },
+        configurable: true
       });
     }
     
@@ -288,8 +321,13 @@ export function renderToString(
     if (node.nodeName === 'STYLE') {
       const styleElement = node as HTMLStyleElement;
       const content = styleElement.textContent;
-      if (content && !capturedStyles.includes(content)) {
-        capturedStyles.push(content);
+      const id = styleElement.id;
+      
+      if (content && id) {
+        const existing = capturedStyles.find(s => s.id === id);
+        if (!existing) {
+          capturedStyles.push({ id, content });
+        }
       }
       // Don't actually append to head during SSR - we'll include in final HTML
       return node;

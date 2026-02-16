@@ -1,0 +1,145 @@
+<div class="layout">
+  <header class="header">
+    <div class="container">
+      <div class="logo">
+        <img src="/icons/logo.svg" alt="Lumix" width="32" height="32" />
+        <span>Lumix</span>
+      </div>
+      <nav class="nav">
+        <a href="/" class="nav-link">
+          <img src="/icons/home.svg" alt="" width="20" height="20" />
+          <span>Home</span>
+        </a>
+        <a href="/about" class="nav-link">
+          <img src="/icons/info.svg" alt="" width="20" height="20" />
+          <span>About</span>
+        </a>
+      </nav>
+    </div>
+  </header>
+  
+  <main class="main">
+    <div class="container">
+      {@slot}
+    </div>
+  </main>
+  
+  <footer class="footer">
+    <div class="container">
+      {@slot footer ?? <p>Built with Lumix • A modern web framework</p>}
+    </div>
+  </footer>
+</div>
+
+<style>
+  * {
+    box-sizing: border-box;
+    font-family: system-ui
+  }
+  
+  body {
+    margin: 0;
+    background: #0a0a0f;
+    color: #e4e4e7;
+  }
+  
+  .layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .header {
+    background: rgba(15, 15, 20, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+  
+  .header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+  }
+  
+  .logo svg {
+    color: #8b5cf6;
+  }
+  
+  .logo img {
+    display: block;
+  }
+  
+  .nav {
+    display: flex;
+    gap: 0.5rem;
+  }
+  
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #a1a1aa;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+  }
+  
+  .nav-link:hover {
+    color: #fff;
+    background: rgba(139, 92, 246, 0.1);
+  }
+  
+  .nav-link svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .nav-link img {
+    display: block;
+    filter: brightness(0) saturate(100%) invert(67%) sepia(6%) saturate(289%) hue-rotate(202deg) brightness(93%) contrast(87%);
+  }
+  
+  .nav-link:hover img {
+    filter: brightness(0) saturate(100%) invert(100%);
+  }
+  
+  .main {
+    flex: 1;
+    padding: 3rem 0;
+  }
+  
+  .footer {
+    background: rgba(15, 15, 20, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 2rem 0;
+    text-align: center;
+    color: #71717a;
+    font-size: 0.875rem;
+  }
+  
+  .footer p {
+    margin: 0;
+  }
+</style>

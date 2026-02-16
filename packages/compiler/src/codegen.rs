@@ -1,6 +1,7 @@
 use crate::ast::*;
 use std::collections::HashMap;
 use crate::transpiler::transpile_ts_snippet;
+use serde_json;
 
 // transpile_ts_to_js moved to transpiler::transpile_ts_snippet
 
@@ -50,11 +51,47 @@ pub fn generate_component_js_esm(component: &ComponentFile, component_name: &str
     
     out.push_str(&generate_component_body(component, true, &script_body, component_name));
 
+    // Export head metadata if present
+    if let Some(head) = &component.head {
+        out.push_str("\n// Head metadata\n");
+        out.push_str("export const head = ");
+        
+        // Serialize head to JSON
+        let head_json = serialize_head_metadata(head);
+        out.push_str(&head_json);
+        out.push_str(";\n");
+    }
+
     out.push_str("\nexport function hydrate(root, props) {\n");
     out.push_str(&format!("  __LUMIX__.hydrate(root, {}, props);\n", component_name));
     out.push_str("}\n");
 
     out
+}
+
+fn serialize_head_metadata(head: &HeadMetadata) -> String {
+    let mut parts = Vec::new();
+    
+    if let Some(title) = &head.title {
+        parts.push(format!("title: {}", serde_json::to_string(title).unwrap()));
+    }
+    
+    if !head.meta.is_empty() {
+        let meta_json = serde_json::to_string(&head.meta).unwrap();
+        parts.push(format!("meta: {}", meta_json));
+    }
+    
+    if !head.link.is_empty() {
+        let link_json = serde_json::to_string(&head.link).unwrap();
+        parts.push(format!("link: {}", link_json));
+    }
+    
+    if !head.script.is_empty() {
+        let script_json = serde_json::to_string(&head.script).unwrap();
+        parts.push(format!("script: {}", script_json));
+    }
+    
+    format!("{{{}}}", parts.join(", "))
 }
 
 pub fn generate_component_factory_js(name: &str, component: &ComponentFile) -> String {
@@ -334,14 +371,28 @@ fn generate_node_h(node: &TemplateNode, indent: usize, is_bundle: bool, strip_sl
                             s.push_str(&format!("'{}': '{}'", name, escape_backticks(value)));
                         }
                         AttributeNode::Dynamic { name, expr } => {
-                            // Wrap to auto-unwrap signals/functions for common reactive values.
-                            // This makes `value={name}` behave like `value={name()}` when `name` is a Signal.
                             let t = transpile_ts_snippet(&expr.code);
                             let e = t.trim();
-                            s.push_str(&format!(
-                                "'{}': () => {{ const __v = ({}); return (typeof __v === 'function') ? __v() : __v; }}",
-                                name, e
-                            ));
+                            
+                            // Check if the expression is a simple literal (number, string, boolean, null, undefined)
+                            // If so, don't wrap it in a function - just use the value directly
+                            let is_literal = e.parse::<f64>().is_ok() // number
+                                || e == "true" || e == "false" // boolean
+                                || e == "null" || e == "undefined" // null/undefined
+                                || (e.starts_with('"') && e.ends_with('"')) // string literal
+                                || (e.starts_with('\'') && e.ends_with('\'')); // string literal
+                            
+                            if is_literal {
+                                // For literals, pass the value directly without wrapping
+                                s.push_str(&format!("'{}': {}", name, e));
+                            } else {
+                                // For variables/expressions, wrap to auto-unwrap signals/functions
+                                // This makes `value={name}` behave like `value={name()}` when `name` is a Signal
+                                s.push_str(&format!(
+                                    "'{}': () => {{ const __v = ({}); return (typeof __v === 'function') ? __v() : __v; }}",
+                                    name, e
+                                ));
+                            }
                         }
                         AttributeNode::EventHandler { name, expr } => {
                             s.push_str(&format!("'{}': {}", name, transpile_ts_snippet(&expr.code).trim()));

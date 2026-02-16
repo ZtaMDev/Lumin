@@ -3,6 +3,20 @@ import path from "path";
 import fs from "fs";
 import { pathToFileURL } from "url";
 /**
+ * Merge config head with route-specific head
+ * Route head takes precedence for title
+ * Meta/link/script arrays are merged
+ */
+function mergeHead(configHead, routeHead) {
+    const merged = {
+        title: routeHead?.title || undefined,
+        meta: [...(configHead?.meta || []), ...(routeHead?.meta || [])],
+        link: [...(configHead?.link || []), ...(routeHead?.link || [])],
+        script: [...(configHead?.script || []), ...(routeHead?.script || [])],
+    };
+    return merged;
+}
+/**
  * Setup happy-dom for SSR rendering
  */
 async function setupHappyDom() {
@@ -100,12 +114,66 @@ function createSSRMiddleware(cwd, config, viteServer, directives) {
                 method: req.method,
             };
             const result = renderToString(Comp, props);
-            // Generate HTML with styles
-            const stylesHtml = result.styles && result.styles.length > 0
-                ? result.styles.map(style => `  <style>${style}</style>`).join('\n')
-                : '';
-            // Find client script for hydration
+            // Calculate safe name for this route
             const safeName = route.path === "/" ? "index" : route.path.slice(1).replace(/\//g, "-");
+            // Extract head metadata from the compiled source (not the Vite bundle)
+            let routeHead = null;
+            try {
+                const compiledPath = path.join(cwd, ".lumix", "compiled", `${safeName}.mjs`);
+                if (fs.existsSync(compiledPath)) {
+                    const compiledUrl = pathToFileURL(compiledPath).href;
+                    const mod = await import(compiledUrl);
+                    if (mod.head) {
+                        routeHead = mod.head;
+                    }
+                }
+            }
+            catch (e) {
+                // Failed to load head
+            }
+            // Merge config head with route head
+            const mergedHead = mergeHead(config.head, routeHead);
+            const pageTitle = mergedHead.title || config?.title || "Lumix App";
+            // Build head section from merged config + route head
+            const headParts = [];
+            // Favicon
+            if (config.favicon) {
+                headParts.push(`  <link rel="icon" href="${escapeHtml(config.favicon)}">`);
+            }
+            // Meta tags from merged head
+            if (mergedHead.meta.length > 0) {
+                for (const meta of mergedHead.meta) {
+                    const attrs = Object.entries(meta)
+                        .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+                        .join(' ');
+                    headParts.push(`  <meta ${attrs}>`);
+                }
+            }
+            // Link tags from merged head
+            if (mergedHead.link.length > 0) {
+                for (const link of mergedHead.link) {
+                    const attrs = Object.entries(link)
+                        .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+                        .join(' ');
+                    headParts.push(`  <link ${attrs}>`);
+                }
+            }
+            // Generate HTML with styles (with IDs)
+            const stylesHtml = result.styles && result.styles.length > 0
+                ? result.styles.map(style => `  <style id="${escapeHtml(style.id)}">${style.content}</style>`).join('\n')
+                : '';
+            // Script tags from merged head (before hydration script)
+            if (mergedHead.script.length > 0) {
+                for (const script of mergedHead.script) {
+                    const attrs = Object.entries(script)
+                        .filter(([key]) => key !== 'innerHTML')
+                        .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+                        .join(' ');
+                    const innerHTML = script.innerHTML || '';
+                    headParts.push(`  <script ${attrs}>${innerHTML}</script>`);
+                }
+            }
+            // Find client script for hydration
             let clientScriptSrc = null;
             // Strategy 1: Try to read manifest
             const manifestPath = path.join(cwd, "dist/client/.vite/manifest.json");
@@ -154,10 +222,11 @@ function createSSRMiddleware(cwd, config, viteServer, directives) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${config?.title ?? "Lumix App"}</title>
+  <title>${pageTitle}</title>
   <meta name="lumix-directive" content="server">
   <meta name="lumix-route" content="${route.path}">
   <meta name="lumix-timestamp" content="${new Date().toISOString()}">
+${headParts.join('\n')}
 ${stylesHtml}
 </head>
 <body>
@@ -174,4 +243,11 @@ ${stylesHtml}
             res.end(`<h1>500 - SSR Error</h1><pre>${error.message}</pre>`);
         }
     };
+}
+function escapeHtml(s) {
+    return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
 }

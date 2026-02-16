@@ -19,6 +19,14 @@ if (document.readyState === 'loading') {
   hydrateComponent();
 }
 
+// HMR: Reload on .lumix file changes
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    console.log('[lumix] Hot reload triggered');
+    window.location.reload();
+  });
+}
+
 document.addEventListener('click', (e) => {
   const link = e.target.closest('a');
   if (!link || link.target === '_blank' || !link.href) return;

@@ -2,17 +2,14 @@ import { defineConfig } from "lumix-js";
 
 export default defineConfig({
   title: "Lumix App",
+  favicon: "/icons/logo.svg",
   rootId: "app",
   srcDir: "src",
-  mode: "ssg",
+  mode: "pir", // Progressive Instant Rendering (PIR) mode
   router: {
     pagesDir: "src/routes",
-    apiDir: "src/routes.api",
   },
   head: {
-    meta: [{ name: "description", content: "Lumix full-stack meta-framework" }],
-  },
-  dev: {
-    showIndicator: true, // Enable dev indicator (drag & drop, hide/show)
+    meta: [{ name: "description", content: "Lumix full-stack meta-framework with PIR" }],
   },
 });

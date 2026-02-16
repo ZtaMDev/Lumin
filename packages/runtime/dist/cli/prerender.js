@@ -2,6 +2,20 @@ import path from "path";
 import fs from "fs";
 import { pathToFileURL } from "url";
 /**
+ * Merge config head with route-specific head
+ * Route head takes precedence for title
+ * Meta/link/script arrays are merged
+ */
+function mergeHead(configHead, routeHead) {
+    const merged = {
+        title: routeHead?.title || undefined,
+        meta: [...(configHead?.meta || []), ...(routeHead?.meta || [])],
+        link: [...(configHead?.link || []), ...(routeHead?.link || [])],
+        script: [...(configHead?.script || []), ...(routeHead?.script || [])],
+    };
+    return merged;
+}
+/**
  * Setup happy-dom as global document/window so lumix-js renderToString works in Node.
  */
 async function setupHappyDom() {
@@ -25,7 +39,7 @@ export async function prerender(options) {
     const { renderToString } = await import("../dom.js");
     const distRoot = path.join(cwd, outDir);
     for (const route of staticRoutes) {
-        console.log(`[lumix prerender] Rendering ${route.path} (static)`);
+        console.log(`[lumix prerender] Rendering ${route.path} (PIR)`);
         // Load the compiled component
         const url = pathToFileURL(route.compiledPath).href;
         let Comp;
@@ -49,6 +63,9 @@ export async function prerender(options) {
             console.warn(`[lumix prerender] Skip ${route.path}: render failed`, e.message);
             continue;
         }
+        // Merge config head with route head
+        const mergedHead = mergeHead(config.head, route.head || null);
+        const pageTitle = mergedHead.title || title;
         // Find the client script for this specific route
         let clientScriptSrc = null;
         // Strategy 1: Try to find in manifest (if available)
@@ -92,10 +109,45 @@ export async function prerender(options) {
         const dir = path.dirname(htmlPath);
         if (!fs.existsSync(dir))
             fs.mkdirSync(dir, { recursive: true });
-        // Include captured styles in the head
+        // Build head section from merged config + route head
+        const headParts = [];
+        // Favicon
+        if (config.favicon) {
+            headParts.push(`  <link rel="icon" href="${escapeHtml(config.favicon)}">`);
+        }
+        // Meta tags from merged head
+        if (mergedHead.meta.length > 0) {
+            for (const meta of mergedHead.meta) {
+                const attrs = Object.entries(meta)
+                    .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+                    .join(' ');
+                headParts.push(`  <meta ${attrs}>`);
+            }
+        }
+        // Link tags from merged head
+        if (mergedHead.link.length > 0) {
+            for (const link of mergedHead.link) {
+                const attrs = Object.entries(link)
+                    .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+                    .join(' ');
+                headParts.push(`  <link ${attrs}>`);
+            }
+        }
+        // Include captured styles with their IDs in the head
         const stylesHtml = result.styles && result.styles.length > 0
-            ? result.styles.map(style => `  <style>${style}</style>`).join('\n')
+            ? result.styles.map(style => `  <style id="${escapeHtml(style.id)}">${style.content}</style>`).join('\n')
             : '';
+        // Script tags from merged head (before hydration script)
+        if (mergedHead.script.length > 0) {
+            for (const script of mergedHead.script) {
+                const attrs = Object.entries(script)
+                    .filter(([key]) => key !== 'innerHTML')
+                    .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+                    .join(' ');
+                const innerHTML = script.innerHTML || '';
+                headParts.push(`  <script ${attrs}>${innerHTML}</script>`);
+            }
+        }
         // Generate hydration script - always hydrate for interactivity
         let hydrationScript = '';
         if (clientScriptSrc) {
@@ -107,9 +159,10 @@ export async function prerender(options) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(title)}</title>
-  <meta name="lumix-directive" content="static">
+  <title>${escapeHtml(pageTitle)}</title>
+  <meta name="lumix-directive" content="pir">
   <meta name="lumix-route" content="${escapeHtml(route.path)}">
+${headParts.join('\n')}
 ${stylesHtml}
 </head>
 <body>

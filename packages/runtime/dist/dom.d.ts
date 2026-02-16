@@ -19,7 +19,10 @@ export interface IslandDescriptor {
 export interface RenderToStringResult {
     html: string;
     islands: IslandDescriptor[];
-    styles?: string[];
+    styles?: Array<{
+        id: string;
+        content: string;
+    }>;
 }
 /**
  * Render a Lumix component to HTML (for SSG/SSR).

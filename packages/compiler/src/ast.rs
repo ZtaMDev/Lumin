@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[derive(Debug, Clone)]
 pub struct ComponentFile {
     pub imports: Vec<ComponentImport>,
@@ -5,6 +7,15 @@ pub struct ComponentFile {
     pub style: Option<StyleBlock>,
     pub template: Vec<TemplateNode>,
     pub defined_slots: Vec<String>,
+    pub head: Option<HeadMetadata>,
+}
+
+#[derive(Debug, Clone)]
+pub struct HeadMetadata {
+    pub title: Option<String>,
+    pub meta: Vec<HashMap<String, String>>,
+    pub link: Vec<HashMap<String, String>>,
+    pub script: Vec<HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone)]

@@ -10,8 +10,17 @@ const VALID_KEYS = new Set([
   "mode",
   "router",
   "ssg",
-  "dev",
+  "publicDir",
+  "outDir",
+  "build",
 ]);
+
+export interface RouteHeadConfig {
+  title?: string;
+  meta?: Array<Record<string, string>>;
+  link?: Array<Record<string, string>>;
+  script?: Array<Record<string, string>>;
+}
 
 export interface LuminConfig {
   /**
@@ -61,35 +70,53 @@ export interface LuminConfig {
   checkTypes?: boolean;
 
   /**
-   * Meta-framework mode. Use "ssg" for the full-stack meta-framework template.
-   * Omit or use default for SPA (blank/blank-ts).
+   * Public directory for static assets. Defaults to 'public'.
    */
-  mode?: "spa" | "ssg";
+  publicDir?: string;
 
   /**
-   * File-based router config (used when mode is "vinxi-ssg").
+   * Output directory for build. Defaults to 'dist'.
    */
-  router?: {
-    pagesDir?: string;
-    apiDir?: string;
-  };
+  outDir?: string;
 
   /**
-   * SSG options (used when mode is "vinxi-ssg").
+   * Build configuration options.
    */
-  ssg?: {
-    enabled?: boolean;
-  };
-
-  /**
-   * Development server options.
-   */
-  dev?: {
+  build?: {
     /**
-     * Show the dev indicator overlay with route info and rendering mode.
-     * Defaults to false.
+     * Output directory. Defaults to 'dist'.
      */
-    showIndicator?: boolean;
+    outDir?: string;
+    
+    /**
+     * Whether to minify the output. Defaults to true in production.
+     */
+    minify?: boolean | 'terser' | 'esbuild';
+    
+    /**
+     * Whether to generate sourcemaps. Defaults to false.
+     */
+    sourcemap?: boolean | 'inline' | 'hidden';
+    
+    /**
+     * Target browsers for the build. Defaults to 'modules'.
+     */
+    target?: string | string[];
+    
+    /**
+     * Chunk size warning limit in kbs. Defaults to 500.
+     */
+    chunkSizeWarningLimit?: number;
+    
+    /**
+     * Whether to empty the output directory before building. Defaults to true.
+     */
+    emptyOutDir?: boolean;
+    
+    /**
+     * Rollup options for advanced configuration.
+     */
+    rollupOptions?: any;
   };
 
   /** Allow extra keys without TS errors, but we'll warn at runtime */

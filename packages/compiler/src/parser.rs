@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::error::CompileError;
 use crate::diagnostic::SourceRange as DiagnosticSourceRange;
+use std::collections::HashMap;
 
 use swc_common::{FileName, SourceMap, DUMMY_SP, Spanned};
 use swc_ecma_ast::{ModuleDecl, ModuleItem, Decl, Pat, Callee};
@@ -19,6 +20,7 @@ pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
         style: None,
         template: Vec::new(),
         defined_slots: Vec::new(),
+        head: None,
     };
 
     parser.skip_ws();
@@ -60,7 +62,7 @@ pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
             let (code, end_pos) = parser.parse_script_or_style_block("</script>")?;
             let abs_start = parser.base_offset + script_start + 8;
             
-            let (cleaned_code, props, imports) = parse_script_block_contents(&code)?;
+            let (cleaned_code, props, imports, head_metadata) = parse_script_block_contents(&code)?;
 
             component.script = Some(ScriptBlock {
                 code: cleaned_code,
@@ -72,6 +74,12 @@ pub fn parse_component(source: &str) -> Result<ComponentFile, CompileError> {
                     end: abs_start + code.len(),
                 }),
             });
+            
+            // Store head metadata if found
+            if let Some(head) = head_metadata {
+                component.head = Some(head);
+            }
+            
             parser.pos = end_pos + 9; // skip </script>
             continue;
         }
@@ -201,7 +209,7 @@ fn parse_imports_block(block: &str) -> Result<Vec<ComponentImport>, CompileError
     Ok(imports)
 }
 
-fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<ScriptImport>), CompileError> {
+fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<ScriptImport>, Option<HeadMetadata>), CompileError> {
     let cm: SourceMap = Default::default();
     let fm = cm.new_source_file(FileName::Custom("script.ts".into()), code.to_string());
     
@@ -226,6 +234,7 @@ fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<Scr
     let mut props: Vec<Prop> = Vec::new();
     let mut imports: Vec<ScriptImport> = Vec::new();
     let mut other_items: Vec<ModuleItem> = Vec::new();
+    let mut head_metadata: Option<HeadMetadata> = None;
 
     for item in transpiled_module.body {
         match item {
@@ -245,6 +254,17 @@ fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<Scr
                     for decl in &var_decl.decls {
                         if let Pat::Ident(ident) = &decl.name {
                             let name = ident.id.sym.to_string();
+                            
+                            // Check if this is "export const head"
+                            if name == "head" {
+                                if let Some(init) = &decl.init {
+                                    // Extract head metadata from the object literal
+                                    head_metadata = extract_head_metadata(init, code, &fm);
+                                }
+                                // Don't add head to other_items, we'll handle it separately
+                                continue;
+                            }
+                            
                             if let Some(init) = &decl.init {
                                 let start = (init.span().lo.0 - fm.start_pos.0) as usize;
                                 let end = (init.span().hi.0 - fm.start_pos.0) as usize;
@@ -332,7 +352,80 @@ fn parse_script_block_contents(code: &str) -> Result<(String, Vec<Prop>, Vec<Scr
     };
     let cleaned_code = emit_module_to_string(&cleaned_mod);
 
-    Ok((cleaned_code, props, imports))
+    Ok((cleaned_code, props, imports, head_metadata))
+}
+
+// Extract head metadata from an object literal expression
+fn extract_head_metadata(expr: &swc_ecma_ast::Expr, code: &str, fm: &swc_common::SourceFile) -> Option<HeadMetadata> {
+    use swc_ecma_ast::{Expr, Lit, PropOrSpread, Prop as SwcProp, KeyValueProp};
+    use std::collections::HashMap;
+    
+    if let Expr::Object(obj_lit) = expr {
+        let mut title: Option<String> = None;
+        let mut meta: Vec<HashMap<String, String>> = Vec::new();
+        let mut link: Vec<HashMap<String, String>> = Vec::new();
+        let mut script: Vec<HashMap<String, String>> = Vec::new();
+        
+        for prop in &obj_lit.props {
+            if let PropOrSpread::Prop(p) = prop {
+                if let SwcProp::KeyValue(KeyValueProp { key, value, .. }) = &**p {
+                    let key_name = match key {
+                        swc_ecma_ast::PropName::Ident(id) => id.sym.to_string(),
+                        swc_ecma_ast::PropName::Str(s) => s.value.to_string(),
+                        _ => continue,
+                    };
+                    
+                    match key_name.as_str() {
+                        "title" => {
+                            if let Expr::Lit(Lit::Str(s)) = &**value {
+                                title = Some(s.value.to_string());
+                            }
+                        }
+                        "meta" | "link" | "script" => {
+                            if let Expr::Array(arr) = &**value {
+                                let mut items = Vec::new();
+                                for elem in &arr.elems {
+                                    if let Some(elem_expr) = elem {
+                                        if let Expr::Object(obj) = &*elem_expr.expr {
+                                            let mut map = HashMap::new();
+                                            for obj_prop in &obj.props {
+                                                if let PropOrSpread::Prop(p) = obj_prop {
+                                                    if let SwcProp::KeyValue(KeyValueProp { key: k, value: v, .. }) = &**p {
+                                                        let k_name = match k {
+                                                            swc_ecma_ast::PropName::Ident(id) => id.sym.to_string(),
+                                                            swc_ecma_ast::PropName::Str(s) => s.value.to_string(),
+                                                            _ => continue,
+                                                        };
+                                                        if let Expr::Lit(Lit::Str(s)) = &**v {
+                                                            map.insert(k_name, s.value.to_string());
+                                                        } else if let Expr::Lit(Lit::Bool(b)) = &**v {
+                                                            map.insert(k_name, b.value.to_string());
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            items.push(map);
+                                        }
+                                    }
+                                }
+                                match key_name.as_str() {
+                                    "meta" => meta = items,
+                                    "link" => link = items,
+                                    "script" => script = items,
+                                    _ => {}
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        
+        return Some(HeadMetadata { title, meta, link, script });
+    }
+    
+    None
 }
 
 fn parse_import_specifiers(spec: &str) -> Result<Vec<ImportSpecifier>, CompileError> {

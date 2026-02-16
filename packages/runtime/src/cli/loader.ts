@@ -1,7 +1,10 @@
 import { bundleRequire } from "bundle-require";
 import path from "path";
 import fs from "fs";
-import type { LuminConfig } from "../config.js";
+import type { LuminConfig, RouteHeadConfig } from "../config.js";
+
+// Re-export types for convenience
+export type { LuminConfig, RouteHeadConfig };
 
 const CONFIG_FILES = [
   "lumix.config.mjs",

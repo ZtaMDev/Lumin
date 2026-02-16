@@ -10,17 +10,17 @@ export async function preview() {
     console.log("");
     console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim(`v${VERSION}`)}`);
     console.log(pc.dim("  Previewing production build...\n"));
-    const isSsg = config.mode === "ssg";
-    // For SSG mode, check for client build output
-    const outDir = isSsg ? path.join(cwd, "dist/client") : path.join(cwd, "dist");
+    const isPir = config.mode === "pir" || config.mode === "ssg"; // Support both for backward compatibility
+    // For PIR mode, check for client build output
+    const outDir = isPir ? path.join(cwd, "dist/client") : path.join(cwd, "dist");
     if (!fs.existsSync(outDir)) {
-        console.error(pc.red(`  Run lumix build first. No ${isSsg ? 'dist/client' : 'dist'} found.\n`));
+        console.error(pc.red(`  Run lumix build first. No ${isPir ? 'dist/client' : 'dist'} found.\n`));
         process.exit(1);
     }
     try {
         // Check if there are server routes that need SSR
         let ssrServer = null;
-        if (isSsg) {
+        if (isPir) {
             const serverDir = path.join(cwd, "dist/server");
             if (fs.existsSync(serverDir)) {
                 console.log(pc.dim("  Starting SSR server for server routes...\n"));
@@ -39,7 +39,7 @@ export async function preview() {
             root: cwd,
             base: "/",
             build: {
-                outDir: isSsg ? "dist/client" : "dist",
+                outDir: isPir ? "dist/client" : "dist",
             },
             preview: {
                 port: 4173,
@@ -75,8 +75,8 @@ export async function preview() {
                                     req.url = url.endsWith("/") ? url + "index.html" : url + "/index.html";
                                 }
                                 else {
-                                    // If SSG mode and route not found, it might be a server route
-                                    if (isSsg) {
+                                    // If PIR mode and route not found, it might be a server route
+                                    if (isPir) {
                                         // Check if this is a server route
                                         const directivesPath = path.join(cwd, ".lumix", "directives.json");
                                         if (fs.existsSync(directivesPath)) {
@@ -123,10 +123,10 @@ export async function preview() {
         });
         const address = server.resolvedUrls?.local?.[0] ?? "http://localhost:4173/";
         console.log(`  ${pc.green("➜")}  ${pc.bold("Preview:")}  ${pc.cyan(address)}`);
-        if (isSsg) {
-            console.log(`  ${pc.dim("  Serving static client build from")} ${pc.white("dist/client")}`);
+        if (isPir) {
+            console.log(`  ${pc.dim("  Serving PIR client build from")} ${pc.white("dist/client")}`);
             if (ssrServer) {
-                console.log(`  ${pc.dim("  Server routes available via SSR server")}`);
+                console.log(`  ${pc.dim("  SSR routes available via SSR server")}`);
             }
         }
         console.log(`  ${pc.green("➜")}  ${pc.dim("press")} ${pc.bold("Ctrl+C")} ${pc.dim("to stop")}\n`);

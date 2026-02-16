@@ -1,4 +1,5 @@
-import type { LuminConfig } from "../config.js";
+import type { LuminConfig, RouteHeadConfig } from "../config.js";
+export type { LuminConfig, RouteHeadConfig };
 /**
  * Find the config file path in the given directory.
  */

@@ -1,13 +1,27 @@
 /// <reference path="../vinxi.d.ts" />
 import { build as viteBuild } from "vite";
+import { pathToFileURL } from "url";
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 /**
  * Parse directive from .lumix file using proper parsing instead of regex
+ * Supported directives:
+ * - "use prerender" -> PIR (Progressive Instant Rendering) - default
+ * - "use server" -> SSR (Server-Side Rendering)
+ * - "use static" -> SSG (Static Site Generation) - future islands architecture
  */
 function parseDirectiveFromLumix(lumixContent: string, routePath: string): string {
   // Extract script section
   const scriptMatch = lumixContent.match(/<script[^>]*>([\s\S]*?)<\/script>/);
   if (!scriptMatch) {
-    return "static"; // No script section, default to static
+    return "prerender"; // No script section, default to prerender (PIR)
   }
   
   const scriptContent = scriptMatch[1];
@@ -31,11 +45,17 @@ function parseDirectiveFromLumix(lumixContent: string, routePath: string): strin
       if (line.startsWith('"use server";') || line.startsWith("'use server';")) {
         foundDirective = "server";
         directiveCount++;
+      } else if (line.startsWith('"use prerender";') || line.startsWith("'use prerender';")) {
+        foundDirective = "prerender";
+        directiveCount++;
       } else if (line.startsWith('"use static";') || line.startsWith("'use static';")) {
         foundDirective = "static";
         directiveCount++;
       } else if (line.startsWith('"use server"') || line.startsWith("'use server'")) {
         foundDirective = "server";
+        directiveCount++;
+      } else if (line.startsWith('"use prerender"') || line.startsWith("'use prerender'")) {
+        foundDirective = "prerender";
         directiveCount++;
       } else if (line.startsWith('"use static"') || line.startsWith("'use static'")) {
         foundDirective = "static";
@@ -52,7 +72,7 @@ function parseDirectiveFromLumix(lumixContent: string, routePath: string): strin
       throw new Error(`Multiple directives found. Only one directive per component is allowed.`);
     }
     
-    return foundDirective || "static";
+    return foundDirective || "prerender";
     
   } catch (error) {
     throw new Error(`Failed to parse directive: ${(error as Error).message}`);
@@ -66,6 +86,97 @@ import path from "path";
 import fs from "fs-extra";
 import { __dirname } from "./utils.js";
 import { VERSION } from "./constants.js";
+
+/**
+ * Recursively compile a .lumix file and all its dependencies
+ */
+async function compileWithDependencies(
+  lumixPath: string,
+  cwd: string,
+  tempDir: string,
+  compile: any,
+  compiled: Set<string> = new Set(),
+  routeSafeName?: string
+): Promise<string> {
+  // Avoid recompiling
+  const normalizedPath = path.normalize(lumixPath);
+  
+  // Calculate safe name for this file
+  let safeName: string;
+  if (routeSafeName) {
+    // This is the main route file
+    safeName = routeSafeName;
+  } else {
+    // This is a dependency - use path relative to src
+    safeName = path.relative(path.join(cwd, 'src'), lumixPath)
+      .replace(/\\/g, '-')
+      .replace(/\//g, '-')
+      .replace(/\.lumix$/, '');
+  }
+  
+  const compiledPath = path.join(tempDir, `${safeName}.mjs`);
+  
+  if (compiled.has(normalizedPath)) {
+    return pathToFileURL(compiledPath).href;
+  }
+  
+  compiled.add(normalizedPath);
+  
+  // Compile this file
+  const js = await compile({ input: lumixPath, bundle: false, checkTypes: false });
+  
+  // Fix runtime imports
+  let fixedJs = js.replace(/from ["']lumin-js["']/g, 'from "lumix-js"')
+                  .replace(/import\s*\*\s*as\s*\w+\s*from\s*["']lumin-js["']/g, (match: string) => 
+                    match.replace('lumin-js', 'lumix-js'))
+                  .replace(/from ["']\/\@fs\/[^"']+\/packages\/runtime\/dist\/index\.js["']/g, 'from "lumix-js"')
+                  .replace(/import\s+\{([^}]+)\}\s+from\s+["']\/\@fs\/[^"']+\/packages\/runtime\/dist\/index\.js["']/g, 'import {$1} from "lumix-js"')
+                  .replace(/import\s+\*\s+as\s+(\w+)\s+from\s+["']\/\@fs\/[^"']+\/packages\/runtime\/dist\/index\.js["']/g, 'import * as $1 from "lumix-js"');
+  
+  // Find all /src/ imports and compile them recursively
+  const importRegex = /(?:from|import)\s+(?:[^'"]*\s+from\s+)?['"]\/src\/([^'"]+\.lumix)['"]/g;
+  const imports: string[] = [];
+  let match;
+  while ((match = importRegex.exec(fixedJs)) !== null) {
+    imports.push(match[1]);
+  }
+  
+  // Compile all dependencies first
+  for (const importPath of imports) {
+    const depPath = path.join(cwd, 'src', importPath);
+    if (fs.existsSync(depPath)) {
+      await compileWithDependencies(depPath, cwd, tempDir, compile, compiled);
+    }
+  }
+  
+  // Now fix the imports to point to compiled versions
+  fixedJs = fixedJs.replace(/from ['"]\/src\/([^'"]+\.lumix)['"]/g, (match: string, relativePath: string) => {
+    const depPath = path.join(cwd, 'src', relativePath);
+    if (fs.existsSync(depPath)) {
+      const depSafeName = relativePath.replace(/\\/g, '-').replace(/\//g, '-').replace(/\.lumix$/, '');
+      const depCompiledPath = path.join(tempDir, `${depSafeName}.mjs`);
+      const depFileUrl = pathToFileURL(depCompiledPath).href;
+      return `from '${depFileUrl}'`;
+    }
+    return match;
+  });
+  
+  fixedJs = fixedJs.replace(/import\s+([^'"]+)\s+from\s+['"]\/src\/([^'"]+\.lumix)['"]/g, (match: string, imports: string, relativePath: string) => {
+    const depPath = path.join(cwd, 'src', relativePath);
+    if (fs.existsSync(depPath)) {
+      const depSafeName = relativePath.replace(/\\/g, '-').replace(/\//g, '-').replace(/\.lumix$/, '');
+      const depCompiledPath = path.join(tempDir, `${depSafeName}.mjs`);
+      const depFileUrl = pathToFileURL(depCompiledPath).href;
+      return `import ${imports} from '${depFileUrl}'`;
+    }
+    return match;
+  });
+  
+  // Write compiled file
+  fs.writeFileSync(compiledPath, fixedJs, 'utf8');
+  
+  return pathToFileURL(compiledPath).href;
+}
 
 /**
  * Generate per-route entry files for code splitting
@@ -85,6 +196,10 @@ async function generateRouteEntries(cwd: string, config: any) {
   const staticRoutes: any[] = [];
   const serverRoutes: any[] = [];
   
+  // Setup temp directory
+  const tempDir = path.join(cwd, ".lumix", "compiled");
+  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+  
   // Compile each route and categorize by directive
   for (const route of routes) {
     const lumixPath = path.join(cwd, route.file.replace(/^\//, ""));
@@ -93,29 +208,37 @@ async function generateRouteEntries(cwd: string, config: any) {
     
     try {
       const lumixContent = fs.readFileSync(lumixPath, "utf8");
-      let directive = "static";
+      let directive = "prerender"; // Default to PIR
       
       try {
         directive = parseDirectiveFromLumix(lumixContent, route.path);
       } catch (error) {
-        console.warn(`[lumix] Warning in ${route.path}: Failed to parse directive, using default 'static'`);
+        console.warn(`[lumix] Warning in ${route.path}: Failed to parse directive, using default 'prerender'`);
       }
       
       routeDirectives[route.path] = directive;
       
-      // Compile the .lumix file
-      const js = await compile({ input: lumixPath, bundle: false, checkTypes: false });
-      const fixedJs = js.replace(/from ["']lumin-js["']/g, 'from "lumix-js"')
-                        .replace(/import\s*\*\s*as\s*\w+\s*from\s*["']lumin-js["']/g, (match) => 
-                          match.replace('lumin-js', 'lumix-js'));
-      
-      // Write compiled component
-      const tempDir = path.join(cwd, ".lumix", "compiled");
-      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-      
+      // Determine the safe name for this route
       const safeName = route.path === "/" ? "index" : route.path.slice(1).replace(/\//g, "-");
+      
+      // Compile the route and all its dependencies recursively
+      await compileWithDependencies(lumixPath, cwd, tempDir, compile, new Set(), safeName);
+      
+      // Get the compiled path
       const tempPath = path.join(tempDir, `${safeName}.mjs`);
-      fs.writeFileSync(tempPath, fixedJs, "utf8");
+      
+      // Extract head metadata from compiled file (now properly exported by compiler)
+      let routeHead: any = null;
+      try {
+        const compiledUrl = pathToFileURL(tempPath).href;
+        const mod = await import(compiledUrl);
+        if (mod.head) {
+          routeHead = mod.head;
+          console.log(`[lumix] Route ${route.path}: Found head metadata`);
+        }
+      } catch (e) {
+        console.warn(`[lumix] Route ${route.path}: Failed to load head metadata:`, (e as Error).message);
+      }
       
       // Generate per-route entry file for client-side hydration with absolute path
       const compiledPathRelative = path.relative(
@@ -146,16 +269,20 @@ export default Component;
         safeName,
         directive,
         entryPath,
-        compiledPath: tempPath
+        compiledPath: tempPath,
+        head: routeHead, // Add head metadata
       };
       
-      if (directive === "static") {
+      // Categorize routes: prerender and static both go to PIR routes for now
+      // In the future, static will use islands architecture
+      if (directive === "prerender" || directive === "static") {
         staticRoutes.push(routeInfo);
       } else {
         serverRoutes.push(routeInfo);
       }
       
-      console.log(`[lumix] Route ${route.path}: ${directive} rendering`);
+      const displayMode = directive === "server" ? "SSR" : directive === "prerender" ? "PIR" : "SSG (future)";
+      console.log(`[lumix] Route ${route.path}: ${displayMode} rendering`);
     } catch (e) {
       console.warn(`[lumix] Failed to compile ${route.file}:`, (e as Error).message);
     }
@@ -176,9 +303,9 @@ export async function build() {
   console.log(`  ${pc.bold(pc.cyan("⚡ LumixJS"))} ${pc.dim(`v${VERSION}`)}`);
   console.log(pc.dim("  Building for production...\n"));
 
-  const isSsg = config.mode === "ssg";
+  const isPir = config.mode === "pir" || config.mode === "ssg"; // Support both for backward compatibility
   
-  if (isSsg) {
+  if (isPir) {
     // Clean dist directory before build
     const distPath = path.join(cwd, "dist");
     if (fs.existsSync(distPath)) {
@@ -192,11 +319,11 @@ export async function build() {
     // Generate per-route entries with code splitting
     const { staticRoutes, serverRoutes, routeDirectives } = await generateRouteEntries(cwd, config);
     
-    console.log(pc.dim(`\n  Static routes: ${staticRoutes.length}, Server routes: ${serverRoutes.length}\n`));
+    console.log(pc.dim(`\n  PIR routes: ${staticRoutes.length}, SSR routes: ${serverRoutes.length}\n`));
     
-    // Build client bundles (only for static routes)
+    // Build client bundles (for PIR routes)
     if (staticRoutes.length > 0) {
-      console.log(pc.dim("  Building client bundles...\n"));
+      console.log(pc.dim("  Building PIR client bundles...\n"));
       
       const clientEntries: { [key: string]: string } = {};
       for (const route of staticRoutes) {
@@ -233,12 +360,12 @@ export async function build() {
         ...config.vite,
       });
       
-      console.log(pc.green("  ✓ Client bundles built\n"));
+      console.log(pc.green("  ✓ PIR client bundles built\n"));
     }
     
-    // Build server bundles (only for server routes)
+    // Build server bundles (for SSR routes)
     if (serverRoutes.length > 0) {
-      console.log(pc.dim("  Building server bundles...\n"));
+      console.log(pc.dim("  Building SSR server bundles...\n"));
       
       const serverEntries: { [key: string]: string } = {};
       for (const route of serverRoutes) {
@@ -276,10 +403,10 @@ export async function build() {
         ...config.vite,
       });
       
-      console.log(pc.green("  ✓ Server bundles built\n"));
+      console.log(pc.green("  ✓ SSR server bundles built\n"));
       
       // Also build client bundles for SSR routes (for hydration)
-      console.log(pc.dim("  Building client bundles for SSR routes...\n"));
+      console.log(pc.dim("  Building SSR client bundles (hydration)...\n"));
       
       const ssrClientEntries: { [key: string]: string } = {};
       for (const route of serverRoutes) {
@@ -319,9 +446,9 @@ export async function build() {
       console.log(pc.green("  ✓ SSR client bundles built\n"));
     }
     
-    // Prerender static routes
+    // Prerender PIR routes
     if (staticRoutes.length > 0) {
-      console.log(pc.dim("  Prerendering static pages...\n"));
+      console.log(pc.dim("  Prerendering PIR pages...\n"));
       
       // Try to read the manifest (optional)
       const manifestPath = path.join(cwd, "dist/client/.vite/manifest.json");
@@ -348,7 +475,7 @@ export async function build() {
         title: config?.title,
       });
       
-      console.log(pc.green("  ✓ Static pages prerendered\n"));
+      console.log(pc.green("  ✓ PIR pages prerendered\n"));
     }
     
     console.log(pc.green(pc.bold("  Build completed successfully!")));
@@ -389,11 +516,58 @@ export async function build() {
                 chunks.find((c: any) => c.type === "chunk" && c.isEntry);
               const jsFile = (entryChunk as any)?.fileName;
               if (!jsFile) return;
+              
+              // Build head section from config
+              const headParts: string[] = [];
+              
+              // Title
+              if (config?.title) {
+                headParts.push(`  <title>${escapeHtml(config.title)}</title>`);
+              }
+              
+              // Favicon
+              if (config?.favicon) {
+                headParts.push(`  <link rel="icon" href="${escapeHtml(config.favicon)}">`);
+              }
+              
+              // Meta tags
+              if (config?.head?.meta) {
+                for (const meta of config.head.meta) {
+                  const attrs = Object.entries(meta)
+                    .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+                    .join(' ');
+                  headParts.push(`  <meta ${attrs}>`);
+                }
+              }
+              
+              // Link tags
+              if (config?.head?.link) {
+                for (const link of config.head.link) {
+                  const attrs = Object.entries(link)
+                    .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+                    .join(' ');
+                  headParts.push(`  <link ${attrs}>`);
+                }
+              }
+              
+              // Script tags (before main script)
+              if (config?.head?.script) {
+                for (const script of config.head.script) {
+                  const attrs = Object.entries(script)
+                    .filter(([key]) => key !== 'innerHTML')
+                    .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+                    .join(' ');
+                  const innerHTML = (script as any).innerHTML || '';
+                  headParts.push(`  <script ${attrs}>${innerHTML}</script>`);
+                }
+              }
+              
               const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+${headParts.join('\n')}
 </head>
 <body>
   <div id="${config?.rootId || "app"}"></div>
